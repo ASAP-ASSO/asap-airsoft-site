@@ -1,0 +1,282 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { db } from '../db/index';
+import { createSession } from '../db/auth';
+import bcrypt from 'bcryptjs';
+
+// Si déjà connecté, rediriger
+if (Astro.locals.user) {
+  return Astro.redirect('/membres');
+}
+
+let errorMsg = "";
+const redirectPath = Astro.url.searchParams.get('redirect') || '/membres';
+
+if (Astro.request.method === "POST") {
+  try {
+    const data = await Astro.request.formData();
+    const username = (data.get("username") as string || "").trim().toLowerCase();
+    const password = (data.get("password") as string || "");
+
+    if (!username || !password) {
+      errorMsg = "Veuillez remplir tous les champs.";
+    } else {
+      const userRes = await db.execute({ sql: 'SELECT * FROM users WHERE LOWER(username) = ?', args: [username] });
+      const user: any = userRes.rows[0];
+
+      if (user && bcrypt.compareSync(password, user.password_hash)) {
+        const sessionId = await createSession(user.id);
+        Astro.cookies.set('session_id', sessionId, {
+          path: '/',
+          httpOnly: true,
+          secure: false,
+          sameSite: 'lax',
+          maxAge: 30 * 24 * 60 * 60
+        });
+        return Astro.redirect(redirectPath);
+      } else {
+        errorMsg = "Identifiants invalides.";
+      }
+    }
+  } catch (e: any) {
+    console.error("Erreur login:", e);
+    errorMsg = "Erreur système lors de la connexion.";
+  }
+}
+---
+
+<Layout
+  title="Connexion Adhérent"
+  description="Espace de connexion sécurisé des adhérents ASAP Airsoft."
+>
+  <div class="login-page">
+    <!-- Aurora Background -->
+    <div class="login-aurora" aria-hidden="true">
+      <div class="aurora-b1"></div>
+      <div class="aurora-b2"></div>
+    </div>
+
+    <div class="login-card glass glass-shine">
+      <!-- Logo -->
+      <div class="login-logo">
+        <span class="logo-badge-sm">ASAP</span>
+        <div class="logo-text-sm">
+          <span>AIRSOFT</span>
+          <span class="logo-sub-sm">ESPACE SÉCURISÉ</span>
+        </div>
+      </div>
+
+      <div class="login-header">
+        <h1 class="login-title">Connexion<br /><span class="title-gradient">Adhérent</span></h1>
+        <p class="login-desc">Accédez à votre profil, aux briefings et à l'agenda privé.</p>
+      </div>
+
+      {errorMsg && (
+        <div class="alert alert-error" role="alert">
+          <span aria-hidden="true">⚠</span>
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      <form class="login-form" method="POST" action="/connexion" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="username">Nom d'utilisateur</label>
+          <input
+            class="form-input"
+            type="text"
+            id="username"
+            name="username"
+            required
+            autocomplete="username"
+            placeholder="votre_pseudo"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Mot de passe</label>
+          <input
+            class="form-input"
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <button type="submit" class="btn btn-filled btn-lg w-full">
+          S'authentifier
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <div class="divider-line" aria-hidden="true"><span>//</span></div>
+        <p class="footer-note">
+          Pas encore membre ou identifiants perdus ?<br />
+          <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="text-brand">Contactez-nous sur Discord ↗</a>
+        </p>
+
+        <div class="status mt-4">
+          <span class="status-dot status-dot--on"></span>
+          <span>Connexion chiffrée · Données sécurisées</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .w-full { width: 100%; }
+  .mt-4   { margin-top: var(--sp-6); }
+
+  .login-page {
+    position: relative;
+    min-height: calc(100dvh - var(--nav-h));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-8) var(--gutter);
+    overflow: hidden;
+  }
+
+  /* Aurora blobs */
+  .login-aurora {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .aurora-b1 {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,212,170,0.10) 0%, transparent 70%);
+    top: -100px;
+    left: -100px;
+    animation: float 14s ease-in-out infinite;
+  }
+
+  .aurora-b2 {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%);
+    bottom: -80px;
+    right: -80px;
+    animation: float 18s ease-in-out infinite reverse;
+  }
+
+  /* Card */
+  .login-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 460px;
+    padding: clamp(2rem, 5vw, 3.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
+  }
+
+  /* Logo zone */
+  .login-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  .logo-badge-sm {
+    font-family: var(--font-title);
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: var(--brand);
+    background: var(--brand-dim);
+    border: 1px solid rgba(0,212,170,0.3);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--r-sm);
+  }
+
+  .logo-text-sm {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .logo-text-sm span:first-child {
+    font-family: var(--font-title);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 2px;
+  }
+
+  .logo-sub-sm {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+  }
+
+  /* Header */
+  .login-header {}
+
+  .login-title {
+    font-size: var(--fs-2xl);
+    margin-bottom: var(--sp-2);
+    line-height: 1.1;
+  }
+
+  .login-desc {
+    font-size: var(--fs-sm);
+    margin: 0;
+  }
+
+  /* Form */
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Footer */
+  .login-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--sp-4);
+  }
+
+  .divider-line {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: var(--sp-4);
+  }
+
+  .divider-line::before,
+  .divider-line::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--glass-border);
+  }
+
+  .divider-line span {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    letter-spacing: 2px;
+  }
+
+  .footer-note {
+    font-size: var(--fs-sm);
+    line-height: 1.7;
+    margin: 0;
+    color: var(--text-muted);
+  }
+</style>

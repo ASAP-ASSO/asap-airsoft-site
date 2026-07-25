@@ -1,0 +1,300 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Breadcrumb from '../components/Breadcrumb.astro';
+---
+
+<Layout
+  title="Airsoft Dominical – Parties du Week-end"
+  description="Découvrez les parties dominicales ASAP à Nay (64). Format convivial, ouvert à tous, avec scénarios variés chaque dimanche dans les Pyrénées-Atlantiques."
+>
+  <div class="page-header container">
+    <Breadcrumb items={[{ label: 'Accueil', href: '/' }, { label: 'Airsoft Dominical' }]} />
+    <span class="section-label">Format Week-end</span>
+    <h1><span class="title-gradient">L'Airsoft Dominical</span></h1>
+    <p class="page-desc">Convivial, accessible à tous les niveaux. Le rendez-vous du dimanche en Béarn.</p>
+  </div>
+
+  <div class="container page-body">
+
+    <!-- Grille principale -->
+    <div class="main-grid">
+
+      <!-- Déroulement -->
+      <section class="glass glass-shine reveal" aria-labelledby="schedule-title">
+        <div class="card-inner">
+          <span class="section-label">Planning type</span>
+          <h2 id="schedule-title" class="text-bright">Déroulement d'un Dimanche</h2>
+          <p class="mt-2 mb-4">De l'accueil au débriefing — voici à quoi ressemble une journée airsoft dominicale avec l'ASAP.</p>
+
+          <div class="timeline">
+            {[
+              { time: '08:30', label: 'Accueil & Chrony', desc: 'Accueil des joueurs et passage Chrony obligatoire pour toutes les répliques.' },
+              { time: '09:15', label: 'Briefing général',  desc: 'Présentation des scénarios du jour et rappel des règles de sécurité.' },
+              { time: '09:30', label: 'Début des hostilités', desc: 'Scénarios courts : Match à mort par équipes, capture de zones.' },
+              { time: '12:30', label: 'Pause déjeuner', desc: 'Pique-nique convivial tiré du sac. Moment de détente entre joueurs.' },
+              { time: '13:45', label: 'Reprise du jeu', desc: 'Scénarios plus longs à objectifs complexes et tactiques avancées.' },
+              { time: '17:00', label: 'Fin & Débriefing', desc: 'Clôture des hostilités, débriefing collectif et nettoyage de la zone.' },
+            ].map((item, i) => (
+              <div class="timeline-item">
+                <div class="timeline-time">
+                  <span class="font-mono text-brand">{item.time}</span>
+                </div>
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                  <strong>{item.label}</strong>
+                  <p>{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <!-- Encart Notre Terrain -->
+      <section class="glass glass-shine reveal mt-4" aria-labelledby="terrain-card-title">
+        <div class="card-inner">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <span class="badge badge-gold">50 HECTARES TACTIQUES</span>
+              <h2 id="terrain-card-title" class="text-bright mt-2">Notre Terrain — Le Parc de Caubous</h2>
+              <p class="text-muted mt-2" style="max-width: 600px; line-height: 1.6;">
+                Forêt boisée naturelle, bunkers en bois, tranchées tactiques et zones CQB aménagées au cœur des Pyrénées-Atlantiques (Nay / Béarn).
+              </p>
+            </div>
+            <a href="/nos-terrains" class="btn btn-gold btn-lg flex-shrink-0 mt-2">
+              Découvrir Nos Terrains →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+
+        <!-- Équipements requis -->
+        <div class="glass glass-shine sidebar-card reveal reveal-delay-1" aria-labelledby="equip-title">
+          <h3 id="equip-title" class="text-bright">Équipements Requis</h3>
+          <ul class="equip-list">
+            {[
+              { code: '// REQUIS', label: 'Protection oculaire balistique', note: 'Obligatoire — EN166B minimum' },
+              { code: '// CONSEILLÉ', label: 'Protection faciale', note: 'Grille ou masque intégral recommandé' },
+              { code: '// TERRAIN', label: 'Chaussures de terrain', note: 'Rangers ou chaussures de randonnée' },
+              { code: '// BIO', label: 'Billes biodégradables', note: 'Obligatoires pour respecter le terrain' },
+            ].map(eq => (
+              <li class="equip-item">
+                <span class="badge badge-brand">{eq.code}</span>
+                <div>
+                  <strong>{eq.label}</strong>
+                  <p>{eq.note}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <!-- Limites de puissance -->
+        <div class="glass glass-shine sidebar-card reveal reveal-delay-2" aria-labelledby="limits-title">
+          <div style="display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-5)">
+            <span class="badge badge-ember">MIL-REG</span>
+            <h3 id="limits-title" class="text-bright">Limites de Puissance</h3>
+          </div>
+          <p class="note-text">Toutes les puissances sont mesurées en Joules avec la bille de jeu utilisée.</p>
+
+          <div class="power-table">
+            {[
+              { type: 'PA / Backup',       limit: '≤ 1.0 J', badge: 'badge-brand' },
+              { type: 'AEG (Assaut)',       limit: '≤ 1.2 J', badge: 'badge-brand' },
+              { type: 'DMR (Anti-snip)',    limit: '≤ 1.5 J', badge: 'badge-gold' },
+              { type: 'Bolt / Sniper',      limit: '≤ 2.0 J', badge: 'badge-ember' },
+            ].map(row => (
+              <div class="power-row">
+                <span class="power-type">{row.type}</span>
+                <span class={`badge ${row.badge}`}>{row.limit}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <!-- CTA inscription -->
+        <div class="glass glass-shine sidebar-card text-center reveal reveal-delay-3">
+          <h3 class="text-brand">Participer ?</h3>
+          <p class="mt-2">Réservez directement votre place pour la prochaine partie dominicale.</p>
+          <a href="/nosparties#form-invite" class="btn btn-gold btn-lg w-full mt-4">
+            Réserver ma place →
+          </a>
+          <a href="/nosparties" class="btn btn-ghost btn-sm w-full mt-2">Voir l'agenda</a>
+          <div style="margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--glass-border)">
+            <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer"
+               style="font-size:var(--fs-xs);color:var(--text-muted)">
+              Communauté Discord ↗
+            </a>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .page-header {
+    padding-block: var(--sp-16) var(--sp-8);
+  }
+
+  h1 { font-size: var(--fs-3xl); }
+  .page-desc { font-size: var(--fs-lg); max-width: 600px; margin-top: var(--sp-3); }
+  .mt-2 { margin-top: var(--sp-3); }
+  .mt-4 { margin-top: var(--sp-6); }
+  .mb-4 { margin-bottom: var(--sp-6); }
+  .w-full { width: 100%; }
+
+  .page-body { padding-bottom: var(--sp-24); }
+
+  /* Grid */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: var(--sp-6);
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  .card-inner { padding: var(--card-pad); }
+
+  /* Timeline */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    margin-top: var(--sp-6);
+  }
+
+  .timeline-item {
+    display: flex;
+    gap: var(--sp-5);
+    align-items: flex-start;
+    padding: var(--sp-4) var(--sp-5);
+    background: rgba(11, 20, 38, 0.5);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-md);
+    transition: var(--t-base);
+  }
+
+  .timeline-item:hover {
+    border-color: var(--glass-border-h);
+    background: rgba(0, 212, 170, 0.05);
+    transform: translateX(4px);
+  }
+
+  .timeline-time {
+    font-size: var(--fs-md);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--brand);
+    min-width: 70px;
+    flex-shrink: 0;
+    padding: 6px 10px;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: var(--r-sm);
+    text-align: center;
+  }
+
+  .timeline-dot {
+    display: none;
+  }
+
+  .timeline-content {
+    flex: 1;
+  }
+
+  .timeline-content strong {
+    display: block;
+    font-family: var(--font-sub);
+    font-size: var(--fs-md);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-bright);
+    margin-bottom: var(--sp-1);
+  }
+
+  .timeline-content p {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+  }
+
+  .sidebar-card { padding: var(--card-pad); }
+
+  .sidebar-card h3 {
+    font-size: var(--fs-lg);
+    margin-bottom: var(--sp-4);
+  }
+
+  /* Equipment list */
+  .equip-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .equip-item {
+    display: flex;
+    gap: var(--sp-4);
+    align-items: flex-start;
+  }
+
+  .equip-icon { font-size: 1.3rem; flex-shrink: 0; }
+
+  .equip-item strong {
+    display: block;
+    color: var(--text-bright);
+    font-family: var(--font-sub);
+    font-size: var(--fs-sm);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .equip-item p { font-size: var(--fs-xs); margin: 0; }
+
+  /* Power table */
+  .note-text { font-size: var(--fs-xs); color: var(--text-muted); margin-bottom: var(--sp-4); }
+
+  .power-table {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .power-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4);
+    background: rgba(255,255,255,0.02);
+    border-radius: var(--r-sm);
+    border: 1px solid var(--glass-border);
+  }
+
+  .power-type {
+    font-family: var(--font-sub);
+    font-size: var(--fs-sm);
+    color: var(--text-main);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .mt-2 { margin-top: var(--sp-3); }
+  .mt-4 { margin-top: var(--sp-6); }
+</style>

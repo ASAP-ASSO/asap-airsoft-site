@@ -1,0 +1,99 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+  title="404 — Signal Perdu | ASAP Airsoft"
+  description="Cette page est introuvable. Retournez à l'accueil ASAP Airsoft."
+>
+  <div class="notfound-wrap container text-center">
+
+    <div class="hud-badge reveal">
+      <span class="badge badge-ember font-mono">// ERREUR 404</span>
+    </div>
+
+    <h1 class="reveal reveal-delay-1">
+      SIGNAL <span class="title-gradient">PERDU</span>
+    </h1>
+
+    <p class="page-desc reveal reveal-delay-2">
+      Cette page est hors zone. Le terrain que vous cherchez n'existe pas
+      ou a été déplacé vers un nouveau secteur.
+    </p>
+
+    <div class="notfound-hud glass glass-shine reveal reveal-delay-2">
+      <span class="hud-row font-mono">
+        <span class="text-muted">STATUT :</span>
+        <span class="text-ember">PAGE_NOT_FOUND</span>
+      </span>
+      <span class="hud-row font-mono">
+        <span class="text-muted">CODE :</span>
+        <span class="text-bright">404</span>
+      </span>
+      <span class="hud-row font-mono">
+        <span class="text-muted">ACTION :</span>
+        <span class="text-brand">RETOUR_AU_QG</span>
+      </span>
+    </div>
+
+    <div class="actions reveal reveal-delay-3">
+      <a href="/" class="btn btn-filled btn-lg">← Retour au QG</a>
+      <a href="/nosparties" class="btn btn-gold btn-lg">Voir l'agenda →</a>
+      <a href="/rejoindre" class="btn btn-primary btn-lg">Rejoindre l'ASAP</a>
+    </div>
+
+  </div>
+</Layout>
+
+<style>
+  .notfound-wrap {
+    padding-block: clamp(4rem, 10vw, 8rem) clamp(6rem, 12vw, 10rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-6);
+  }
+
+  h1 {
+    font-size: clamp(3rem, 5rem + 4vw, 8rem);
+    font-family: var(--font-title);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 4px;
+    margin: 0;
+  }
+
+  .page-desc {
+    font-size: var(--fs-lg);
+    max-width: 520px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .notfound-hud {
+    padding: var(--sp-6) var(--sp-8);
+    border-radius: var(--r-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-width: 280px;
+    text-align: left;
+  }
+
+  .hud-row {
+    display: flex;
+    gap: var(--sp-4);
+    font-size: var(--fs-sm);
+    letter-spacing: 0.5px;
+  }
+
+  .hud-row .text-muted { min-width: 80px; }
+
+  .actions {
+    display: flex;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: var(--sp-4);
+  }
+</style>

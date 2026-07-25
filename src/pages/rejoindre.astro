@@ -1,0 +1,244 @@
+---
+import Layout from '../layouts/Layout.astro';
+import TarifsSection from '../components/TarifsSection.astro';
+import ReglementModal from '../components/ReglementModal.astro';
+
+const faqItems = [
+  {
+    q: "Quelles sont les conditions pour rejoindre le club ASAP Airsoft ?",
+    a: "Vous devez être majeur (18 ans révolus au jour de l'inscription) et vous acquitter de la cotisation annuelle de l'association. Les mineurs ne sont pas acceptés pour des raisons d'assurance."
+  },
+  {
+    q: "Proposez-vous de la location de matériel pour débuter ?",
+    a: "Oui ! L'association dispose du Pack Découverte (réplique AEG, masque de protection intégral homologué, billes bio et chargeur) disponible sur réservation rapide via le site ou Discord."
+  },
+  {
+    q: "Quelles sont les règles de sécurité et de puissance des répliques (Chrony) ?",
+    a: "Toutes les puissances sont mesurées en Joules avec la bille de jeu utilisée. Limites officielles : PA/Backup ≤ 1.0J, AEG (Assaut) ≤ 1.2J, DMR (Anti-snip) ≤ 1.5J, Bolt/Sniper ≤ 2.0J. Billes biodégradables obligatoires."
+  },
+  {
+    q: "Où se déroulent les parties d'airsoft ?",
+    a: "L'association est basée à Nay (64800). Nos parties dominicales et événements Milsim se déroulent sur notre terrain principal de 50 hectares situé au Parc de Caubous dans le Béarn."
+  },
+  {
+    q: "Comment participer à une première partie de découverte ?",
+    a: "Remplissez le formulaire d'inscription rapide sur la page Agenda ou rejoignez notre serveur Discord public !"
+  }
+];
+
+const schemaFAQ = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": faqItems.map(item => ({
+    "@type": "Question",
+    "name": item.q,
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": item.a
+    }
+  }))
+};
+---
+
+<Layout
+  title="Nous Rejoindre & FAQ – Adhésion Airsoft Nay (64)"
+  description="Comment rejoindre l'ASAP Airsoft à Nay (64) ? Modalités d'adhésion, tarifs, matériel de location, règles Chrony et Foire Aux Questions (FAQ)."
+>
+  <script type="application/ld+json" is:inline set:html={JSON.stringify(schemaFAQ)} />
+
+  <!-- Page Header -->
+  <div class="page-header container">
+    <span class="section-label">Adhésion & Informations</span>
+    <h1><span class="title-gradient">Nous Rejoindre</span> & FAQ</h1>
+    <p class="page-desc">Toutes les informations nécessaires pour intégrer l'association ASAP et jouer à Nay (64).</p>
+  </div>
+
+  <div class="container page-body">
+
+    <!-- Étapes pour rejoindre -->
+    <section class="mb-16 reveal">
+      <div class="text-center mb-10">
+        <span class="section-label">Parcours Adhérent</span>
+        <h2>4 Étapes Simple pour Jouer</h2>
+      </div>
+
+      <div class="steps-grid">
+        <div class="glass glass-shine step-card">
+          <span class="step-num font-mono">01</span>
+          <h3 class="step-title">Rejoindre le Discord</h3>
+          <p class="step-desc">Le Discord est le QG virtuel de l'association. Présentez-vous pour accéder au calendrier des parties.</p>
+          <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm mt-4">Discord ASAP 💬</a>
+        </div>
+
+        <div class="glass glass-shine step-card">
+          <span class="step-num font-mono">02</span>
+          <h3 class="step-title">Partie de Découverte</h3>
+          <p class="step-desc">Venez tester une journée avec votre réplique ou louez un pack complet directement auprès de l'asso.</p>
+          <a href="/nosparties" class="btn btn-ghost btn-sm mt-4">Voir l'Agenda 📅</a>
+        </div>
+
+        <div class="glass glass-shine step-card">
+          <span class="step-num font-mono">03</span>
+          <h3 class="step-title">Validation & Fiche</h3>
+          <p class="step-desc">Remplissez la fiche d'inscription avec attestation de responsabilité civile et réglez votre cotisation.</p>
+        </div>
+
+        <div class="glass glass-shine step-card">
+          <span class="step-num font-mono">04</span>
+          <h3 class="step-title">Bienvenue au Club</h3>
+          <p class="step-desc">Accédez à votre espace adhérent, au forum Milsim et aux événements officiels ASAP de l'année.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grille des Tarifs & Prêt -->
+    <TarifsSection />
+
+    <!-- Charte de Sécurité Imprimable -->
+    <ReglementModal />
+
+    <!-- FAQ Section -->
+    <section class="glass glass-shine faq-section reveal mb-16" aria-labelledby="faq-heading">
+      <div class="faq-header">
+        <span class="section-label">Questions Fréquentes</span>
+        <h2 id="faq-heading" class="title-gradient">Foire Aux Questions</h2>
+        <p class="text-muted mt-2">Retrouvez les réponses aux questions les plus posées par les nouveaux joueurs.</p>
+      </div>
+
+      <div class="faq-accordion">
+        {faqItems.map((item, index) => (
+          <details class="faq-item" open={index === 0}>
+            <summary class="faq-question">
+              <span class="font-mono text-brand mr-2">Q{index + 1}.</span>
+              <strong>{item.q}</strong>
+              <span class="faq-icon font-mono">+</span>
+            </summary>
+            <div class="faq-answer">
+              <p>{item.a}</p>
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
+
+    <!-- CTA Contact -->
+    <div class="glass glass-shine text-center p-8 reveal" style="max-width: 600px; margin: 0 auto var(--sp-16);">
+      <span class="section-label">Encore une question ?</span>
+      <h3 class="title-gradient text-xl mt-2">Contactez notre Staff</h3>
+      <p class="text-muted text-sm mt-2 mb-6">Notre équipe répond à toutes vos questions sur Discord sous 24 heures.</p>
+      <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="btn btn-filled btn-lg">
+        Poser une question sur Discord
+      </a>
+    </div>
+
+  </div>
+</Layout>
+
+<style>
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--sp-6);
+  }
+
+  .step-card {
+    padding: var(--card-pad);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .step-num {
+    font-size: var(--fs-2xl);
+    font-weight: 900;
+    color: var(--brand-gold, #c1b97f);
+    opacity: 0.8;
+    margin-bottom: var(--sp-2);
+  }
+
+  .step-title {
+    font-size: var(--fs-md);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-bright);
+    margin-bottom: var(--sp-2);
+  }
+
+  .step-desc {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* FAQ */
+  .faq-section {
+    padding: var(--card-pad);
+  }
+
+  .faq-header {
+    margin-bottom: var(--sp-8);
+    padding-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .faq-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .faq-item {
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    background: rgba(0,0,0,0.2);
+    overflow: hidden;
+    transition: var(--t-fast);
+  }
+
+  .faq-item[open] {
+    border-color: rgba(201,168,76,0.3);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .faq-question {
+    padding: var(--sp-4);
+    font-size: var(--fs-md);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    list-style: none;
+  }
+
+  .faq-question::-webkit-details-marker { display: none; }
+
+  .faq-question strong {
+    color: var(--text-bright);
+    font-family: var(--font-sub);
+    letter-spacing: 0.5px;
+  }
+
+  .faq-icon {
+    font-size: 1.2rem;
+    color: var(--text-brand);
+    transition: transform 0.2s ease;
+  }
+
+  .faq-item[open] .faq-icon {
+    transform: rotate(45deg);
+  }
+
+  .faq-answer {
+    padding: 0 var(--sp-4) var(--sp-4) var(--sp-4);
+    border-top: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .faq-answer p {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    margin-top: var(--sp-3);
+    margin-bottom: 0;
+    line-height: 1.6;
+  }
+</style>

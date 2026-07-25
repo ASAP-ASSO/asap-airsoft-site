@@ -1,0 +1,161 @@
+---
+// CaubousMap.astro - Carte & Accès au Parc de Caubous
+---
+
+<div class="caubous-map-container glass glass-shine">
+  <div class="map-header">
+    <div>
+      <span class="badge badge-brand">ZONE D'OPÉRATION</span>
+      <h3 class="text-bright mt-1">Terrain Officiel : Parc de Caubous</h3>
+      <p class="text-muted" style="font-size:var(--fs-sm)">
+        Siège associatif à Nay (64800) — Le terrain de jeu se situe au Parc de Caubous.
+      </p>
+    </div>
+
+    <div class="gps-badge font-mono">
+      <span>📍 Adresse : 6FV5+H9 Caubous</span>
+    </div>
+  </div>
+
+  <div class="map-grid">
+    <!-- Visual / Details -->
+    <div class="map-info">
+      <div class="info-block">
+        <h4 class="text-gold font-mono">// ZONES DU TERRAIN (50 HA)</h4>
+        <ul class="terrain-zones">
+          <li>
+            <strong>Safe Zone & Confort</strong> : Parking ombragé, tables de préparation, Barbecue, Toilettes, Micro-ondes, Frigo, Machine à café.
+          </li>
+          <li>
+            <strong>Chrony Range</strong> : Zone de tir de réglage et passage chrono obligatoires.
+          </li>
+          <li>
+            <strong>Zone Forêt Haute (50 HA)</strong> : Couvert végétal dense, dénivelés tactiques, sentiers d'infiltration.
+          </li>
+        </ul>
+      </div>
+
+      <div class="access-buttons mt-6">
+        <a
+          href="https://www.google.com/maps/search/?api=1&query=6FV5%2BH9+Caubous"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-primary btn-sm"
+        >
+          Google Maps (6FV5+H9)
+        </a>
+        <a
+          href="https://waze.com/ul?q=6FV5%2BH9+Caubous&navigate=yes"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-gold btn-sm"
+        >
+          Lancer Waze
+        </a>
+      </div>
+    </div>
+
+    <!-- Interactive / Embed Map Placeholder -->
+    <div class="map-embed-wrap glass">
+      <iframe
+        title="Localisation Parc de Caubous ASAP Airsoft"
+        width="100%"
+        height="320"
+        style="border:0; border-radius: var(--radius-md); filter: grayscale(0.6) contract(1.2) invert(0.9);"
+        loading="lazy"
+        allowfullscreen
+        src="https://maps.google.com/maps?q=6FV5%2BH9+Caubous&hl=fr&z=15&output=embed"
+      ></iframe>
+      <div class="map-overlay-badge font-mono">
+        <span class="status-dot status-dot--on"></span>
+        <span>PARC DE CAUBOUS · TERRAIN SECTOR</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .caubous-map-container {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    margin-block: var(--sp-8);
+    border-radius: var(--radius-lg);
+  }
+
+  .map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: var(--sp-4);
+    margin-bottom: var(--sp-6);
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+  }
+
+  .gps-badge {
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    color: var(--brand);
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: var(--fs-xs);
+  }
+
+  .map-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-6);
+    align-items: center;
+  }
+
+  .terrain-zones {
+    list-style: none;
+    padding: 0;
+    margin-top: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    font-size: var(--fs-sm);
+  }
+
+  .terrain-zones li {
+    color: var(--text-muted);
+  }
+
+  .terrain-zones strong {
+    color: var(--text-bright);
+  }
+
+  .access-buttons {
+    display: flex;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+  }
+
+  .map-embed-wrap {
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .map-overlay-badge {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid var(--glass-border);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--brand);
+  }
+
+  @media (max-width: 768px) {
+    .map-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

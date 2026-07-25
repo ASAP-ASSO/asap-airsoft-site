@@ -1,0 +1,419 @@
+---
+// LiveRegistrationsWidget.astro - Bandeau de défilé des inscrits avec Insignes de Rangs CoD Style
+import { db } from '../db';
+import { getRankForXp, getXpRewardForPack } from '../utils/xpRank';
+
+const defaultDate = 'Prochain Dimanche (Briefing 08h45)';
+
+let initialCount = 0;
+let initialPseudos: Array<{
+  display_name: string;
+  pack_option: string;
+  xp: number;
+  rank_name: string;
+  rank_color: string;
+  rank_glow: string;
+  rank_icon_svg: string;
+}> = [];
+
+try {
+  const countRes = await db.execute({ sql: `SELECT COUNT(*) as total FROM guest_registrations WHERE event_date = ?`, args: [defaultDate] });
+  initialCount = Number((countRes.rows[0] as any)?.total || 0);
+
+  const rowsRes = await db.execute({
+    sql: `
+      SELECT g.id, g.pseudo, g.name, g.phone, g.event_date, g.pack_option, g.created_at, p.xp
+      FROM guest_registrations g
+      LEFT JOIN player_xp p ON REPLACE(g.phone, ' ', '') = p.phone OR g.pseudo = p.pseudo
+      WHERE g.event_date = ?
+      ORDER BY g.created_at DESC
+      LIMIT 30
+    `,
+    args: [defaultDate]
+  });
+  const rows = rowsRes.rows as unknown as Array<{ pseudo: string; name: string; pack_option: string; xp?: number }>;
+
+  initialPseudos = rows.map(r => {
+    const name = r.pseudo || r.name.split(' ')[0];
+    const xp = typeof r.xp === 'number' ? r.xp : getXpRewardForPack(r.pack_option);
+    const rank = getRankForXp(xp);
+    return {
+      display_name: name,
+      pack_option: r.pack_option,
+      xp,
+      rank_name: rank.name,
+      rank_color: rank.color,
+      rank_glow: rank.glow,
+      rank_icon_svg: rank.iconSvg
+    };
+  });
+} catch (e) {
+  // Fallback if DB not reachable
+}
+
+// SSR display list (dupliqué pour défilé immédiat sans flash)
+const ssrPseudos = initialPseudos.length > 0
+  ? [...initialPseudos, ...initialPseudos]
+  : [];
+---
+
+<div
+  class="live-registrations-widget glass glass-shine reveal"
+  id="live-registrations"
+  data-initial-pseudos={JSON.stringify(initialPseudos)}
+>
+  <div class="widget-header">
+    <div class="header-left">
+      <span class="status-dot status-dot--on"></span>
+      <h3 class="widget-title">Participants Inscrits</h3>
+      <span class="badge badge-brand ml-2">EN DIRECT</span>
+    </div>
+
+    <!-- Sélecteur de date & Compteur -->
+    <div class="header-right">
+      <select id="event-date-select" class="form-control font-mono date-select" aria-label="Sélectionner la date">
+        <option value="Prochain Dimanche (Briefing 08h45)" selected>Prochain Dimanche (Briefing 08h45)</option>
+        <option value="Dimanche dans 2 semaines">Dimanche dans 2 semaines</option>
+        <option value="Opération Spéciale Milsim [TAG Milsim]">Opération Spéciale Milsim [TAG Milsim]</option>
+      </select>
+
+      <div class="counter-badge glass">
+        <span class="counter-num" id="total-count-val">{initialCount}</span>
+        <span class="counter-unit">joueur(s)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conteneur 1 ligne unique adaptative -->
+  <div class="single-line-container has-fade" id="single-line-container">
+    <div class="single-line-track is-scrolling" id="single-line-track">
+      {ssrPseudos.length > 0 ? (
+        ssrPseudos.map((item) => (
+          <div
+            class="player-pill"
+            style={`--rank-color: ${item.rank_color}; --rank-glow: ${item.rank_glow};`}
+            title={`${item.display_name} — Rang ${item.rank_name} (${item.xp} XP)`}
+          >
+            <span class="pill-rank-icon" Fragment set:html={item.rank_icon_svg} />
+            <strong class="pill-name">{item.display_name}</strong>
+            <span class="pill-rank-tag">{item.rank_name}</span>
+          </div>
+        ))
+      ) : (
+        <div class="players-empty">
+          <span class="text-muted">Aucune inscription pour cette date. Soyez le premier inscrit !</span>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+
+<script>
+  let rawPseudos: Array<{
+    display_name: string;
+    xp: number;
+    rank_name: string;
+    rank_color: string;
+    rank_glow: string;
+    rank_icon_svg: string;
+    pack_option: string;
+  }> = [];
+
+  function checkAndSetScroll() {
+    const container = document.getElementById('single-line-container');
+    const track = document.getElementById('single-line-track');
+    if (!container || !track) return;
+
+    if (rawPseudos.length === 0) {
+      track.classList.remove('is-scrolling');
+      container.classList.remove('has-fade');
+      return;
+    }
+
+    let html = '';
+    rawPseudos.forEach((item) => {
+      html += `
+        <div class="player-pill" style="--rank-color: ${item.rank_color}; --rank-glow: ${item.rank_glow};" title="${item.display_name} — Rang ${item.rank_name} (${item.xp} XP)">
+          <span class="pill-rank-icon">${item.rank_icon_svg}</span>
+          <strong class="pill-name">${item.display_name}</strong>
+          <span class="pill-rank-tag">${item.rank_name}</span>
+        </div>
+      `;
+    });
+
+    track.classList.remove('is-scrolling');
+    container.classList.remove('has-fade');
+    track.innerHTML = html;
+
+    // Si le contenu déborde de la ligne -> activer l'animation défilante très lente
+    if (track.scrollWidth > container.clientWidth) {
+      container.classList.add('has-fade');
+      let duplicatedHtml = html + html;
+      if (rawPseudos.length < 4) {
+        duplicatedHtml += html + html;
+      }
+      track.innerHTML = duplicatedHtml;
+
+      // Vitesse ultra lente fixe : 10 pixels par seconde (ex: 750 secondes pour 30 joueurs)
+      const singleTrackWidth = track.scrollWidth / (rawPseudos.length < 4 ? 4 : 2);
+      const targetSpeedPxPerSec = 10;
+      const calculatedDuration = Math.max(60, Math.round(singleTrackWidth / targetSpeedPxPerSec));
+
+      track.style.animationDuration = calculatedDuration + 's';
+      track.classList.add('is-scrolling');
+    }
+  }
+
+  async function loadRegistrations(eventDate: string) {
+    const totalCountEl = document.getElementById('total-count-val');
+    const track = document.getElementById('single-line-track');
+    if (!totalCountEl || !track) return;
+
+    try {
+      const res = await fetch(`/api/registrations?event_date=${encodeURIComponent(eventDate)}`);
+      if (!res.ok) throw new Error('API indisponible');
+      const data = await res.json();
+
+      totalCountEl.textContent = data.total_inscrits.toString();
+
+      if (data.inscrits && data.inscrits.length > 0) {
+        rawPseudos = data.inscrits;
+        checkAndSetScroll();
+      } else {
+        rawPseudos = [];
+        track.classList.remove('is-scrolling');
+        track.innerHTML = `
+          <div class="players-empty">
+            <span class="text-muted">Aucune inscription pour cette date pour l'instant. Soyez le premier inscrit !</span>
+          </div>
+        `;
+      }
+    } catch (e) {
+      console.error('Erreur chargement inscrits:', e);
+    }
+  }
+
+  function initWidget() {
+    const widget = document.getElementById('live-registrations');
+    if (widget) {
+      const initialAttr = widget.getAttribute('data-initial-pseudos');
+      if (initialAttr) {
+        try {
+          rawPseudos = JSON.parse(initialAttr);
+        } catch (e) {}
+      }
+    }
+
+    checkAndSetScroll();
+    window.removeEventListener('resize', checkAndSetScroll);
+    window.addEventListener('resize', checkAndSetScroll);
+
+    const selectEl = document.getElementById('event-date-select') as HTMLSelectElement;
+    if (selectEl) {
+      selectEl.removeEventListener('change', onSelectChange);
+      selectEl.addEventListener('change', onSelectChange);
+    }
+  }
+
+  function onSelectChange(e: Event) {
+    const selectEl = e.target as HTMLSelectElement;
+    if (selectEl) {
+      loadRegistrations(selectEl.value);
+    }
+  }
+
+  // Executer au chargement direct ET lors des transitions Astro (astro:page-load)
+  document.addEventListener('DOMContentLoaded', initWidget);
+  document.addEventListener('astro:page-load', initWidget);
+  initWidget();
+</script>
+
+<style is:global>
+  .live-registrations-widget {
+    padding: clamp(1rem, 2vw, 1.4rem);
+    margin-block: var(--sp-6);
+    border-radius: var(--r-md);
+    background: rgba(11, 18, 32, 0.55);
+    border: 1px solid var(--glass-border);
+    overflow: hidden;
+  }
+
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    padding-bottom: var(--sp-3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  .widget-title {
+    font-size: var(--fs-md);
+    color: var(--text-bright);
+    font-family: var(--font-title);
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+  }
+
+  .date-select {
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+    background: rgba(4, 6, 10, 0.6);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-sm);
+    color: var(--text-main);
+  }
+
+  .counter-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-sm);
+    background: rgba(0, 212, 170, 0.08);
+    border: 1px solid rgba(0, 212, 170, 0.25);
+  }
+
+  .counter-num {
+    font-size: var(--fs-md);
+    font-weight: 800;
+    font-family: var(--font-mono);
+    color: var(--brand);
+  }
+
+  .counter-unit {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+  }
+
+  /* ── LIGNE UNIQUE ADAPTATIVE ─────────────────────────────── */
+  .single-line-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    padding-block: var(--sp-2);
+    border-radius: var(--r-sm);
+    background: rgba(4, 6, 10, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .single-line-container.has-fade {
+    mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
+  }
+
+  .single-line-track {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    width: max-content;
+    white-space: nowrap;
+    will-change: transform;
+  }
+
+  .single-line-track.is-scrolling {
+    animation: marquee-slow 600s linear infinite !important;
+  }
+
+  .single-line-container:hover .single-line-track.is-scrolling {
+    animation-play-state: paused;
+  }
+
+  @keyframes marquee-slow {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  /* ── PILULES STYLE COD PRESTIGE BADGES (GLOBAL) ──────────────── */
+  .player-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: var(--sp-2) !important;
+    padding: 0.45rem 1rem !important;
+    border-radius: 999px !important;
+    white-space: nowrap !important;
+    transition: all 0.25s ease !important;
+    flex-shrink: 0 !important;
+    font-family: var(--font-sub) !important;
+    letter-spacing: 0.5px !important;
+    font-size: var(--fs-sm) !important;
+    background: rgba(11, 18, 32, 0.75) !important;
+    border: 1.5px solid var(--rank-color, rgba(0, 212, 170, 0.4)) !important;
+    color: var(--text-bright) !important;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .player-pill:hover {
+    transform: translateY(-2px) !important;
+    border-color: var(--rank-color) !important;
+    box-shadow: 0 0 18px var(--rank-glow, rgba(0, 212, 170, 0.4)) !important;
+  }
+
+  .pill-rank-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: var(--rank-color) !important;
+    line-height: 1 !important;
+    filter: drop-shadow(0 0 4px var(--rank-color)) !important;
+  }
+
+  .pill-rank-icon svg {
+    display: block !important;
+  }
+
+  .pill-name {
+    font-weight: 700 !important;
+    color: var(--text-bright) !important;
+  }
+
+  .pill-rank-tag {
+    font-size: 0.65rem !important;
+    font-family: var(--font-mono) !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.8px !important;
+    color: var(--rank-color) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    border: 1px solid var(--rank-color) !important;
+    text-transform: uppercase !important;
+  }
+
+  .players-empty {
+    width: 100%;
+    padding: var(--sp-2) var(--sp-4);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .widget-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .header-right {
+      width: 100%;
+      justify-content: space-between;
+    }
+  }
+</style>

@@ -1,0 +1,178 @@
+---
+// TarifsSection.astro - Tarifs & Prêt de matériel (Parc de Caubous / ASAP Airsoft)
+---
+
+<section class="tarifs-section" id="tarifs">
+  <div class="section-header text-center mb-6">
+    <span class="section-label">Tarifs & Adhésion</span>
+    <h2>Participer aux <span class="title-gradient">Parties & Prêt de Matériel</span></h2>
+    <p class="section-desc">
+      Que vous veniez avec votre propre équipement ou en Pack Découverte, nous vous accueillons au Parc de Caubous.
+    </p>
+  </div>
+
+  <div class="tarifs-grid">
+    <!-- Card 1: Invité Dominical -->
+    <div class="tarif-card glass glass-shine">
+      <div class="tarif-badge font-mono">PARTICIPANT OCCASIONNEL</div>
+      <h3 class="tarif-title">Invité Dominical</h3>
+      <div class="tarif-price">
+        <span class="price-num">10€</span>
+        <span class="price-period">/ journée</span>
+      </div>
+      <p class="tarif-desc">Idéal pour jouer sur le terrain du Parc de Caubous si vous possédez votre équipement.</p>
+      
+      <ul class="tarif-features">
+        <li><strong>+</strong> Accès au terrain de 50 hectares du Parc de Caubous</li>
+        <li><strong>+</strong> Passage Chrony & Fair-play garanti</li>
+        <li><strong>+</strong> Café d'accueil & Briefing sécurité</li>
+        <li class="text-muted"><strong>-</strong> Matériel non fourni (Équipement personnel requis)</li>
+      </ul>
+
+      <a href="/nosparties" class="btn btn-primary w-full mt-auto text-center">Réserver une date →</a>
+    </div>
+
+    <!-- Card 2: Pack Découverte / Prêt (POPULAIRE) -->
+    <div class="tarif-card glass glass-shine tarif-card--featured">
+      <div class="featured-tag">Venez découvrir !</div>
+      <div class="tarif-badge font-mono text-gold">PRÊT DE MATÉRIEL</div>
+      <h3 class="tarif-title">Pack Découverte</h3>
+      <div class="tarif-price">
+        <span class="price-num text-gold">25€</span>
+        <span class="price-period">/ journée</span>
+      </div>
+      <p class="tarif-desc">Vous n'avez pas de matériel ? On vous fournit le matériel complet pour jouer en toute sécurité !</p>
+      
+      <ul class="tarif-features">
+        <li><strong>+</strong> <strong>Droit de jeu inclus</strong> pour la journée</li>
+        <li><strong>+</strong> <strong>Réplique AEG tactique</strong> (Propulsion électrique)</li>
+        <li><strong>+</strong> <strong>Masque de protection intégral</strong> homologué ANSI/EN166B</li>
+        <li><strong>+</strong> <strong>Bouteille / Sachet de Billes BIODÉGRADABLES</strong> fournies</li>
+        <li><strong>+</strong> Encadrement & Conseils prise en main par l'équipe</li>
+      </ul>
+
+      <a href="/nosparties#form-invite" class="btn btn-gold w-full mt-auto text-center">Réserver un Pack Découverte →</a>
+    </div>
+
+    <!-- Card 3: Adhésion Membre -->
+    <div class="tarif-card glass glass-shine">
+      <div class="tarif-badge font-mono text-brand">MEMBRE ASSOC</div>
+      <h3 class="tarif-title">Cotisation Annuelle</h3>
+      <div class="tarif-price">
+        <span class="price-num text-brand">25€</span>
+        <span class="price-period">/ an</span>
+      </div>
+      <p class="tarif-desc">Rejoignez la famille ASAP, bénéficiez de tarifs préférentiels et intégrez la section Milsim.</p>
+      
+      <ul class="tarif-features">
+        <li><strong>+</strong> <strong>Droit de jeu à 5€ seulement</strong> (au lieu de 10€) par partie</li>
+        <li><strong>+</strong> <strong>MOITIÉ PRIX (-50%)</strong> sur tous nos Événements & Milsim</li>
+        <li><strong>+</strong> Accès au <strong>Forum Privé Milsim</strong> & Rôle Discord</li>
+      </ul>
+
+      <a href="/rejoindre" class="btn btn-filled w-full mt-auto text-center">Devenir Membre ASAP →</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tarifs-section {
+    padding-block: var(--sp-12);
+  }
+
+  .section-desc {
+    max-width: 600px;
+    margin-inline: auto;
+    margin-top: var(--sp-2);
+    color: var(--text-muted);
+  }
+
+  .tarifs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--sp-6);
+    margin-top: var(--sp-8);
+  }
+
+  .tarif-card {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    border-radius: var(--r-lg);
+    position: relative;
+  }
+
+  .tarif-card--featured {
+    border-color: rgba(230, 180, 0, 0.5);
+    background: radial-gradient(ellipse 100% 80% at 50% 0%, rgba(230, 180, 0, 0.1) 0%, transparent 80%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .featured-tag {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gold);
+    color: #000;
+    font-weight: 800;
+    font-size: var(--fs-xs);
+    padding: 3px 14px;
+    border-radius: var(--r-full);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .tarif-badge {
+    font-size: var(--fs-xs);
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: var(--sp-2);
+  }
+
+  .tarif-title {
+    font-size: var(--fs-xl);
+    color: var(--text-bright);
+  }
+
+  .tarif-price {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin-block: var(--sp-4);
+  }
+
+  .price-num {
+    font-size: 3rem;
+    font-weight: 900;
+    font-family: var(--font-title);
+    line-height: 1;
+  }
+
+  .price-period {
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+  }
+
+  .tarif-desc {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--sp-6);
+  }
+
+  .tarif-features {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    font-size: var(--fs-sm);
+    margin-bottom: var(--sp-8);
+  }
+
+  .tarif-features li {
+    color: var(--text-bright);
+  }
+</style>

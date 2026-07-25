@@ -1,0 +1,187 @@
+---
+// ReglementModal.astro - Charte de Sécurité & Règlement Intérieur ASAP Airsoft
+---
+
+<div class="reglement-box glass glass-shine" id="reglement-securite">
+  <div class="reglement-header">
+    <div>
+      <span class="badge badge-ember">CHARTE OFFICIELLE</span>
+      <h3 class="text-bright mt-1">Règlement Intérieur & Sécurité</h3>
+      <p class="text-muted" style="font-size:var(--fs-sm)">
+        Document officiel de l'Association Sportive Airsoft Pyrénéenne (Nay - Parc de Caubous).
+      </p>
+    </div>
+
+    <button id="btn-print-rules" class="btn btn-gold btn-sm print-hide">
+      📄 Télécharger / Imprimer (PDF)
+    </button>
+  </div>
+
+  <div class="reglement-content" id="printable-rules">
+    <div class="rules-section">
+      <h4 class="rules-subtitle font-mono">1. SÉCURITÉ OCULAIRE & PROTECTION (OBLIGATOIRE)</h4>
+      <p>
+        Les <strong>lunettes de protection homologuées EN166B / ANSI Z87.1</strong> avec protection latérale sont obligatoires
+        dès la sortie de la Safe Zone. Le port d'un masque de grillage ou protection bas du visage est fortement conseillé.
+      </p>
+    </div>
+
+    <div class="rules-section mt-4">
+      <h4 class="rules-subtitle font-mono">2. BILLES BIODÉGRADABLES OBLIGATOIRES</h4>
+      <p>
+        Pour préserver le site naturel du **Parc de Caubous**, seules les billes <strong>100% BIODÉGRADABLES</strong> sont autorisées sur le terrain. Des contrôles inopinés peuvent avoir lieu.
+      </p>
+    </div>
+
+    <div class="rules-section mt-4">
+      <h4 class="rules-subtitle font-mono">3. PUISSANCES CHRONY & DISTANCES D'ENGAGEMENT</h4>
+      <div class="rules-table-wrap">
+        <table class="rules-table font-mono">
+          <thead>
+            <tr>
+              <th>Catégorie</th>
+              <th>Puissance Max (Joules)</th>
+              <th>Distance Min. Tir</th>
+              <th>Mode de tir</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PA / Backup</td>
+              <td>≤ 1.0 Joule</td>
+              <td>0 Mètre / Courte distance</td>
+              <td>Semi-auto</td>
+            </tr>
+            <tr>
+              <td>AEG (Assaut)</td>
+              <td>≤ 1.2 Joules</td>
+              <td>5 Mètres</td>
+              <td>Burst / Semi (Rafales courtes)</td>
+            </tr>
+            <tr>
+              <td>DMR (Anti-Sniper)</td>
+              <td>≤ 1.5 Joules</td>
+              <td>15 Mètres</td>
+              <td>Semi-auto strict (Pas de rafale)</td>
+            </tr>
+            <tr>
+              <td>Bolt / Sniper</td>
+              <td>≤ 2.0 Joules</td>
+              <td>25 Mètres</td>
+              <td>Armement manuel</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="rules-section mt-4">
+      <h4 class="rules-subtitle font-mono">4. RÈGLES EN SAFE ZONE</h4>
+      <p>
+        En Safe Zone (parking/zone de repos) : <strong>Chargeur retiré</strong>, réplique sur <strong>CRAN DE SÛRETÉ</strong>, et tir à vide de sécurité effectué avant d'entrer.
+      </p>
+    </div>
+
+    <div class="rules-section mt-4">
+      <h4 class="rules-subtitle font-mono">5. FAIR-PLAY & ESPRIT SPORTIF</h4>
+      <p>
+        L'airsoft repose sur l'honnêteté. Dès qu'une bille vous touche (réplique ou équipement inclus), vous criez haut et fort <strong>"OUT !"</strong>, levez le bras et mettez votre gilet rouge de mort.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('btn-print-rules')?.addEventListener('click', () => {
+    window.print();
+  });
+</script>
+
+<style>
+  .reglement-box {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    margin-block: var(--sp-8);
+    border-radius: var(--radius-lg);
+  }
+
+  .reglement-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: var(--sp-4);
+    margin-bottom: var(--sp-6);
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+  }
+
+  .rules-subtitle {
+    color: var(--brand);
+    font-size: var(--fs-sm);
+    letter-spacing: 1px;
+    margin-bottom: var(--sp-2);
+  }
+
+  .rules-table-wrap {
+    overflow-x: auto;
+    margin-block: var(--sp-3);
+  }
+
+  .rules-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-xs);
+    text-align: left;
+  }
+
+  .rules-table th,
+  .rules-table td {
+    padding: var(--sp-3);
+    border: 1px solid var(--glass-border);
+  }
+
+  .rules-table th {
+    background: rgba(0, 212, 170, 0.1);
+    color: var(--brand);
+  }
+
+  .rules-table td {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-bright);
+  }
+
+  /* Print Stylesheet for PDF downloading */
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    .print-hide {
+      display: none !important;
+    }
+    #printable-rules, #printable-rules * {
+      visibility: visible;
+    }
+    #printable-rules {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      color: #000 !important;
+      background: #fff !important;
+      padding: 20px;
+    }
+    .rules-subtitle {
+      color: #000 !important;
+      border-bottom: 1px solid #ccc;
+    }
+    .rules-table th {
+      background: #eee !important;
+      color: #000 !important;
+    }
+    .rules-table td {
+      background: #fff !important;
+      color: #000 !important;
+      border-color: #ccc !important;
+    }
+  }
+</style>

@@ -1,0 +1,428 @@
+---
+// GuestRegistrationForm.astro - Formulaire d'inscription rapide avec Modale XP & Rangs CoD Style
+---
+
+<div class="guest-signup-box glass glass-shine" id="form-invite">
+  <div class="signup-header text-center">
+    <span class="badge badge-gold">RÉSERVATION EXPRESS</span>
+    <h3 class="text-bright mt-1">Inscription Rapide Partie Dominicale</h3>
+    <p class="text-muted" style="font-size:var(--fs-sm)">
+      Pas encore membre ? Réservez votre place au Parc de Caubous en 1 minute et gagnez de l'XP.
+    </p>
+  </div>
+
+  <form id="guest-form" class="signup-form mt-6">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="guest-nom" class="form-label">Nom & Prénom *</label>
+        <input type="text" id="guest-nom" required class="form-control" placeholder="Ex: Jean Dupont" />
+      </div>
+      <div class="form-group">
+        <label for="guest-pseudo" class="form-label">Pseudo Airsoft (Optionnel)</label>
+        <input type="text" id="guest-pseudo" class="form-control font-mono" placeholder="Ex: Ghost64" />
+      </div>
+    </div>
+
+    <div class="form-row mt-4">
+      <div class="form-group">
+        <label for="guest-email" class="form-label">Adresse Email *</label>
+        <input type="email" id="guest-email" required class="form-control" placeholder="jean.dupont@example.com" />
+      </div>
+      <div class="form-group">
+        <label for="guest-phone" class="form-label">Téléphone (Suivi du Rang & SMS) *</label>
+        <input type="tel" id="guest-phone" required class="form-control font-mono" placeholder="06 12 34 56 78" />
+      </div>
+    </div>
+
+    <div class="form-row mt-4">
+      <div class="form-group">
+        <label for="guest-date" class="form-label">Date de la Session au Parc de Caubous *</label>
+        <select id="guest-date" required class="form-control font-mono">
+          <option value="Prochain Dimanche (Briefing 08h45)">Prochain Dimanche (Briefing 08h45)</option>
+          <option value="Dimanche dans 2 semaines">Dimanche dans 2 semaines</option>
+          <option value="Opération Spéciale Milsim [TAG Milsim]">Opération Spéciale Milsim [TAG Milsim]</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="guest-pack" class="form-label" id="guest-pack-label">Formule & Rôle *</label>
+        <select id="guest-pack" required class="form-control">
+          <option value="J'ai mon propre matériel (P.A.F 10€)">J'ai mon matériel (+100 XP - 10€)</option>
+          <option value="Pack Découverte Prêt complet (25€)">Pack Découverte (+150 XP - 25€)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group mt-4">
+      <label for="guest-notes" class="form-label">Remarques ou questions</label>
+      <textarea id="guest-notes" rows="2" class="form-control" placeholder="Première fois ? Besoins spécifiques ?"></textarea>
+    </div>
+
+    <div class="form-footer mt-6">
+      <button type="submit" class="btn btn-gold btn-lg w-full text-center" id="submit-btn">
+        Confirmer ma demande de réservation →
+      </button>
+    </div>
+  </form>
+
+  <!-- Confirmation message standard -->
+  <div id="signup-success" class="signup-success glass hidden text-center">
+    <span class="badge badge-brand mb-3">RÉSERVATION VALIDÉE</span>
+    <h4 class="text-bright">Demande de Réservation Enregistrée !</h4>
+    <p class="mt-2 text-muted" id="success-details">
+      Merci <strong id="res-name"></strong> ! Votre inscription pour le <strong id="res-date"></strong> au **Parc de Caubous** est confirmée.
+    </p>
+    
+    <div class="discord-sync-box glass mt-4 p-4">
+      <span class="badge badge-gold">ÉTAPE SUIVANTE</span>
+      <h4 class="text-bright mt-2" style="font-size:var(--fs-md)">Découvrez le Déroulé de votre Journée !</h4>
+      <p class="font-mono text-muted mt-2" style="font-size:var(--fs-xs)">
+        Retrouvez le planning complet (horaires, briefing, règles et équipements conseillés) pour votre session au Parc de Caubous.
+      </p>
+      <div class="flex gap-3 justify-center flex-wrap mt-4">
+        <a href="/airsoft-dominical" class="btn btn-gold btn-sm">
+          Découvrir le déroulé d'une journée →
+        </a>
+        <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm">
+          Discord ASAP ↗
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE TACTIQUE DE LEVEL UP & RECOMPENSE XP (CoD STYLE) -->
+<div id="xp-level-modal" class="xp-modal-backdrop hidden" role="dialog" aria-modal="true">
+  <div class="xp-modal-card glass glass-shine">
+    <button class="xp-modal-close" id="xp-modal-close-btn" aria-label="Fermer">✕</button>
+
+    <div class="xp-modal-header text-center">
+      <span class="xp-banner-badge">// INSCRIPTION CONFIRMÉE</span>
+      <h3 class="xp-modal-title title-gradient">GAIN D'EXPÉRIENCE !</h3>
+    </div>
+
+    <div class="xp-reward-box text-center mt-4">
+      <span class="xp-reward-num" id="modal-xp-gained">+150 XP</span>
+      <p class="xp-reward-label font-mono">CRÉDITÉ SUR VOTRE PROFIL</p>
+    </div>
+
+    <!-- Badge du Rang Débloqué -->
+    <div class="rank-unlock-card mt-4" id="modal-rank-card">
+      <div class="rank-icon-big" id="modal-rank-icon"></div>
+      <div class="rank-info">
+        <span class="rank-label">RANG ACTUEL</span>
+        <h4 class="rank-name-title" id="modal-rank-name">OPÉRATIONNEL</h4>
+        <span class="rank-xp-total font-mono" id="modal-total-xp">350 XP TOTAL</span>
+      </div>
+    </div>
+
+    <div class="discord-cta-footer mt-5 text-center">
+      <p class="text-muted" style="font-size:var(--fs-xs)">
+        Votre pseudo et votre grade apparaissent désormais en direct dans le bandeau de défilé !
+      </p>
+      <button class="btn btn-gold btn-lg w-full mt-3" id="modal-continue-btn">
+        Voir mon grade dans le bandeau →
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById('guest-form') as HTMLFormElement;
+  const successBox = document.getElementById('signup-success');
+  const resName = document.getElementById('res-name');
+  const resDate = document.getElementById('res-date');
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+  const dateSelect = document.getElementById('guest-date') as HTMLSelectElement;
+  const packSelect = document.getElementById('guest-pack') as HTMLSelectElement;
+
+  function updatePackOptions() {
+    if (!dateSelect || !packSelect) return;
+    const isMilsim = dateSelect.value.toLowerCase().includes('milsim');
+
+    if (isMilsim) {
+      packSelect.innerHTML = `
+        <option value="Opérateur (Opération Milsim +250 XP - 35€)">Opérateur (+250 XP - 35€)</option>
+        <option value="Plastron (Opération Milsim +250 XP - 35€)">Plastron (+250 XP - 35€)</option>
+      `;
+    } else {
+      packSelect.innerHTML = `
+        <option value="J'ai mon propre matériel (P.A.F 10€)">J'ai mon matériel (+100 XP - 10€)</option>
+        <option value="Pack Découverte Prêt complet (25€)">Pack Découverte (+150 XP - 25€)</option>
+      `;
+    }
+  }
+
+  if (dateSelect) {
+    dateSelect.addEventListener('change', updatePackOptions);
+    updatePackOptions();
+  }
+
+  // Eléments Modale
+  const modal = document.getElementById('xp-level-modal');
+  const modalXpGained = document.getElementById('modal-xp-gained');
+  const modalRankName = document.getElementById('modal-rank-name');
+  const modalTotalXp = document.getElementById('modal-total-xp');
+  const modalRankIcon = document.getElementById('modal-rank-icon');
+  const modalRankCard = document.getElementById('modal-rank-card');
+  const modalCloseBtn = document.getElementById('xp-modal-close-btn');
+  const modalContinueBtn = document.getElementById('modal-continue-btn');
+
+  function closeModal() {
+    if (modal) modal.classList.add('hidden');
+  }
+
+  if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeModal);
+  if (modalContinueBtn) modalContinueBtn.addEventListener('click', closeModal);
+
+  if (form && successBox && resName && resDate) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const nom = (document.getElementById('guest-nom') as HTMLInputElement).value;
+      const pseudo = (document.getElementById('guest-pseudo') as HTMLInputElement).value;
+      const email = (document.getElementById('guest-email') as HTMLInputElement).value;
+      const phone = (document.getElementById('guest-phone') as HTMLInputElement).value;
+      const dateVal = (document.getElementById('guest-date') as HTMLSelectElement).value;
+      const packVal = (document.getElementById('guest-pack') as HTMLSelectElement).value;
+      const notes = (document.getElementById('guest-notes') as HTMLTextAreaElement).value;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enregistrement en cours...';
+
+      try {
+        const res = await fetch('/api/guest-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: nom,
+            pseudo,
+            email,
+            phone,
+            event_date: dateVal,
+            pack_option: packVal,
+            notes
+          })
+        });
+
+        const responseData = await res.json();
+
+        if (!res.ok) {
+          alert('⚠️ ' + (responseData.error || 'Erreur lors de l\'inscription.'));
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Confirmer ma demande de réservation →';
+          return;
+        }
+
+        resName.textContent = pseudo || nom;
+        resDate.textContent = dateVal;
+
+        form.classList.add('hidden');
+        successBox.classList.remove('hidden');
+
+        // Remplir la Modale de Level Up
+        if (modal && modalXpGained && modalRankName && modalTotalXp && modalRankIcon && modalRankCard) {
+          modalXpGained.textContent = `+${responseData.xp_gained || 150} XP`;
+          modalRankName.textContent = responseData.rank_name || 'RECRUE';
+          modalTotalXp.textContent = `${responseData.total_xp || 150} XP TOTAL (${responseData.games_count || 1} session(s))`;
+          
+          if (responseData.rank_icon_svg) {
+            modalRankIcon.innerHTML = responseData.rank_icon_svg;
+          }
+          if (responseData.rank_color) {
+            modalRankCard.style.borderColor = responseData.rank_color;
+            modalRankCard.style.boxShadow = `0 0 25px ${responseData.rank_glow || responseData.rank_color}`;
+            modalRankName.style.color = responseData.rank_color;
+          }
+
+          modal.classList.remove('hidden');
+        }
+
+        // Trigger refresh sur le widget des inscrits
+        const selectEl = document.getElementById('event-date-select') as HTMLSelectElement;
+        if (selectEl) {
+          selectEl.value = dateVal;
+          selectEl.dispatchEvent(new Event('change'));
+        }
+      } catch (err) {
+        alert('Erreur de connexion au serveur.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirmer ma demande de réservation →';
+      }
+    });
+  }
+</script>
+
+<style>
+  .guest-signup-box {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    margin-block: var(--sp-8);
+    border-radius: var(--r-lg);
+    border-color: rgba(230, 180, 0, 0.3);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-4);
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  .signup-success {
+    padding: var(--sp-6);
+  }
+
+  .discord-sync-box {
+    border-color: rgba(0, 212, 170, 0.4);
+    background: rgba(0, 212, 170, 0.05);
+    border-radius: var(--r-md);
+  }
+
+  /* ── MODALE TACTIQUE LEVEL UP (CoD STYLE) ─────────────────── */
+  .xp-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4, 6, 10, 0.85);
+    backdrop-filter: blur(12px);
+    padding: var(--sp-4);
+    animation: fadeIn 0.3s ease;
+  }
+
+  .xp-modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    border-radius: var(--r-xl);
+    background: rgba(11, 18, 32, 0.95);
+    border: 1.5px solid var(--brand);
+    box-shadow: 0 0 40px rgba(0, 212, 170, 0.3);
+    animation: popUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .xp-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1.2rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: var(--t-fast);
+  }
+
+  .xp-modal-close:hover {
+    color: var(--brand);
+  }
+
+  .xp-banner-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--brand);
+    letter-spacing: 1.5px;
+  }
+
+  .xp-modal-title {
+    font-size: var(--fs-xl);
+    font-family: var(--font-title);
+    margin-top: var(--sp-1);
+  }
+
+  .xp-reward-box {
+    padding: var(--sp-4);
+    background: rgba(0, 212, 170, 0.08);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: var(--r-md);
+  }
+
+  .xp-reward-num {
+    font-size: 2.8rem;
+    font-weight: 900;
+    font-family: var(--font-title);
+    color: var(--brand);
+    text-shadow: 0 0 20px rgba(0, 212, 170, 0.5);
+  }
+
+  .xp-reward-label {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  .rank-unlock-card {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    background: rgba(17, 28, 50, 0.8);
+    border-radius: var(--r-md);
+    border: 1.5px solid var(--brand);
+    transition: var(--t-base);
+  }
+
+  .rank-icon-big {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .rank-icon-big :global(svg) {
+    width: 28px;
+    height: 28px;
+  }
+
+  .rank-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .rank-label {
+    font-size: var(--fs-xs);
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  .rank-name-title {
+    font-size: var(--fs-lg);
+    font-family: var(--font-title);
+    letter-spacing: 1px;
+    margin-block: 2px;
+  }
+
+  .rank-xp-total {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes popUp {
+    from { opacity: 0; transform: scale(0.85) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  @media (max-width: 600px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

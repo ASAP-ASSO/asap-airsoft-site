@@ -1,0 +1,789 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { db } from '../../../db/index';
+import { checkContentSafety, sanitizeText } from '../../../lib/moderation-filter';
+import crypto from 'crypto';
+
+const currentUser = Astro.locals.user!; // Garanti par le middleware
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/forum');
+}
+
+// 1. Incrémenter le nombre de vues
+await db.execute({ sql: `UPDATE forum_topics SET views_count = COALESCE(views_count, 0) + 1 WHERE id = ?`, args: [id] });
+
+// 2. Récupérer le sujet avec sa catégorie
+const topicRes = await db.execute({
+  sql: `
+    SELECT 
+      t.id, 
+      t.title, 
+      t.created_at, 
+      t.is_pinned,
+      t.is_locked,
+      t.is_ai_generated,
+      t.views_count,
+      u.username,
+      c.name as category_name,
+      c.color as category_color,
+      c.icon as category_icon
+    FROM forum_topics t
+    JOIN users u ON t.created_by = u.id
+    LEFT JOIN forum_categories c ON t.category_id = c.id
+    WHERE t.id = ?
+  `,
+  args: [id]
+});
+const topic: any = topicRes.rows[0];
+
+if (!topic) {
+  return Astro.redirect('/forum');
+}
+
+// 2b. Récupérer les tags associés
+const topicTagsRes = await db.execute({
+  sql: `
+    SELECT tg.name, tg.slug, tg.color 
+    FROM forum_tags tg
+    JOIN forum_topic_tags tt ON tg.id = tt.tag_id
+    WHERE tt.topic_id = ?
+  `,
+  args: [id]
+});
+const topicTags = topicTagsRes.rows as any[];
+
+let errorMsg = "";
+let successMsg = "";
+
+// 3. Traitement POST : Actions de modération, réactions et réponses
+if (Astro.request.method === "POST") {
+  try {
+    const data = await Astro.request.formData();
+    const action = data.get("action") as string || "reply";
+
+    // Actions réservées aux Administrateurs
+    if (currentUser.role === 'admin') {
+      if (action === "pin_topic") {
+        await db.execute({ sql: 'UPDATE forum_topics SET is_pinned = NOT is_pinned WHERE id = ?', args: [id] });
+        return Astro.redirect(`/forum/topic/${id}`);
+      } else if (action === "lock_topic") {
+        await db.execute({ sql: 'UPDATE forum_topics SET is_locked = NOT is_locked WHERE id = ?', args: [id] });
+        return Astro.redirect(`/forum/topic/${id}`);
+      } else if (action === "delete_topic") {
+        await db.execute({ sql: 'DELETE FROM forum_topics WHERE id = ?', args: [id] });
+        return Astro.redirect('/forum');
+      } else if (action === "delete_post") {
+        const postId = data.get("post_id") as string;
+        if (postId) {
+          await db.execute({ sql: 'DELETE FROM forum_posts WHERE id = ? AND topic_id = ?', args: [postId, id] });
+          return Astro.redirect(`/forum/topic/${id}`);
+        }
+      }
+    }
+
+    // Action : Signalement par les membres
+    if (action === "report_post") {
+      const postId = data.get("post_id") as string;
+      const reason = (data.get("reason") as string || "Contenu inapproprié").trim();
+      if (postId) {
+        await db.execute({
+          sql: `
+            INSERT INTO forum_reports (id, topic_id, post_id, reported_by, reason)
+            VALUES (?, ?, ?, ?, ?)
+          `,
+          args: [crypto.randomUUID(), id, postId, currentUser.id, reason]
+        });
+        successMsg = "Signalement transmis à la modération.";
+      }
+    } else if (action === "react") {
+      const postId = data.get("post_id") as string;
+      const emoji = data.get("emoji") as string;
+
+      if (postId && emoji) {
+        const existingRes = await db.execute({
+          sql: `
+            SELECT id FROM forum_post_reactions 
+            WHERE post_id = ? AND user_id = ? AND emoji = ?
+          `,
+          args: [postId, currentUser.id, emoji]
+        });
+        const existing = existingRes.rows[0] as any;
+
+        if (existing) {
+          await db.execute({ sql: `DELETE FROM forum_post_reactions WHERE id = ?`, args: [existing.id] });
+        } else {
+          await db.execute({
+            sql: `
+              INSERT INTO forum_post_reactions (id, post_id, user_id, emoji)
+              VALUES (?, ?, ?, ?)
+            `,
+            args: [crypto.randomUUID(), postId, currentUser.id, emoji]
+          });
+        }
+
+        return Astro.redirect(`/forum/topic/${id}#post-${postId}`);
+      }
+    } else if (action === "reply") {
+      // Vérifier si le sujet est verrouillé
+      if (topic.is_locked === 1 && currentUser.role !== 'admin') {
+        errorMsg = "Impossible de répondre : ce sujet est verrouillé par la modération.";
+      } else {
+        const rawContent = (data.get("content") as string || "").trim();
+        const safetyCheck = checkContentSafety(rawContent);
+
+        if (!rawContent) {
+          errorMsg = "Le message ne peut pas être vide.";
+        } else if (!safetyCheck.safe) {
+          errorMsg = `Message rejeté : ${safetyCheck.reason}`;
+        } else {
+          const content = sanitizeText(rawContent);
+          const newPostId = crypto.randomUUID();
+          await db.execute({
+            sql: `
+              INSERT INTO forum_posts (id, topic_id, content, created_by)
+              VALUES (?, ?, ?, ?)
+            `,
+            args: [newPostId, id, content, currentUser.id]
+          });
+
+          return Astro.redirect(`/forum/topic/${id}#post-${newPostId}`);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.error("Erreur action forum:", e);
+    errorMsg = "Une erreur est survenue lors de l'opération.";
+  }
+}
+
+// 4. Récupérer tous les messages
+const postsRawRes = await db.execute({
+  sql: `
+    SELECT p.id, p.content, p.created_at, u.username, u.role
+    FROM forum_posts p
+    JOIN users u ON p.created_by = u.id
+    WHERE p.topic_id = ?
+    ORDER BY p.created_at ASC
+  `,
+  args: [id]
+});
+const postsRaw = postsRawRes.rows as any[];
+
+// 5. Récupérer les réactions pour chaque post
+const AVAILABLE_EMOJIS = ['👍', '🎯', '🔥', '🛡️'];
+
+const posts = await Promise.all(postsRaw.map(async p => {
+  const reactionsListRes = await db.execute({
+    sql: `SELECT emoji, user_id FROM forum_post_reactions WHERE post_id = ?`,
+    args: [p.id]
+  });
+  const reactionsList = reactionsListRes.rows as unknown as Array<{ emoji: string; user_id: string }>;
+
+  const reactionsMap: Record<string, { count: number; userReacted: boolean }> = {};
+
+  AVAILABLE_EMOJIS.forEach(e => {
+    reactionsMap[e] = { count: 0, userReacted: false };
+  });
+
+  reactionsList.forEach(r => {
+    if (!reactionsMap[r.emoji]) {
+      reactionsMap[r.emoji] = { count: 0, userReacted: false };
+    }
+    reactionsMap[r.emoji].count += 1;
+    if (r.user_id === currentUser.id) {
+      reactionsMap[r.emoji].userReacted = true;
+    }
+  });
+
+  return {
+    ...p,
+    reactions: reactionsMap
+  };
+}));
+
+const firstPost = posts[0];
+const replies = posts.slice(1);
+---
+
+<Layout title={topic.title}>
+  <section class="container py-5">
+    <div class="my-3">
+      <div class="top-nav-flex">
+        <a href="/forum" class="back-link">◀ Retour au Forum Milsim</a>
+
+        <!-- Barre de Modération Admin HUD -->
+        {currentUser.role === 'admin' && (
+          <div class="admin-mod-bar">
+            <span class="mod-label">🛠️ MODÉRATION ADMIN :</span>
+            <form method="POST" class="mod-form">
+              <button type="submit" name="action" value="pin_topic" class={`hud-btn-mini ${topic.is_pinned ? 'btn-pinned-active' : ''}`}>
+                {topic.is_pinned ? '📌 Désépingler' : '📌 Épingler'}
+              </button>
+              <button type="submit" name="action" value="lock_topic" class={`hud-btn-mini ${topic.is_locked ? 'btn-locked-active' : ''}`}>
+                {topic.is_locked ? '🔓 Déverrouiller' : '🔒 Verrouiller'}
+              </button>
+              <button type="submit" name="action" value="delete_topic" class="hud-btn-mini btn-danger" onclick="return confirm('Confirmer la suppression définitive du sujet ?');">
+                🗑️ Supprimer Sujet
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+      
+      <div class="topic-header-bar my-3">
+        <div class="badges-row">
+          {topic.is_pinned === 1 && <span class="badge-hud badge-pinned">📌 ÉPINGLÉ</span>}
+          {topic.is_locked === 1 && <span class="badge-hud badge-locked">🔒 VERROUILLÉ</span>}
+          {topic.is_ai_generated === 1 && <span class="badge-hud badge-ai">⚡ AUTO-IA</span>}
+          {topic.category_name && (
+            <span class="badge-hud badge-cat" style={`border-color: ${topic.category_color}; color: ${topic.category_color};`}>
+              {topic.category_icon} {topic.category_name}
+            </span>
+          )}
+          {topicTags.map((tg: any) => (
+            <span class="badge-hud badge-tag" style={`border-color: ${tg.color}; color: ${tg.color}; background-color: rgba(0, 0, 0, 0.2);`}>
+              #{tg.name}
+            </span>
+          ))}
+        </div>
+
+        <h1 class="topic-page-title my-2">{topic.title}</h1>
+        
+        <p class="topic-info">
+          Briefing ouvert par <span class="author">{topic.username}</span> le {new Date(topic.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} • 👁️ {topic.views_count} consultations
+        </p>
+      </div>
+    </div>
+
+    {errorMsg && (
+      <div class="hud-panel error-box my-3">
+        <span>⚠️ {errorMsg}</span>
+      </div>
+    )}
+
+    {successMsg && (
+      <div class="hud-panel success-box my-3">
+        <span>✔ {successMsg}</span>
+      </div>
+    )}
+
+    {topic.is_locked === 1 && (
+      <div class="hud-panel locked-banner my-3">
+        <span>🔒 SUJET VERROUILLÉ PAR LA MODÉRATION : Les nouvelles réponses sont suspendues.</span>
+      </div>
+    )}
+
+    <div class="posts-list py-3">
+      <!-- Premier message (Briefing Initial) -->
+      {firstPost && (
+        <div class="post-item first-post-item hud-panel" id={`post-${firstPost.id}`}>
+          <div class="post-sidebar">
+            <span class="user-avatar">👤</span>
+            <span class="user-name">{firstPost.username}</span>
+            <span class={`user-role-badge ${firstPost.role === 'admin' ? 'role-admin' : 'role-user'}`}>
+              {firstPost.role}
+            </span>
+          </div>
+          <div class="post-main">
+            <div class="post-header">
+              <span class="badge-post-type">TRANSMISSION INITIALE</span>
+              <div class="post-header-actions">
+                <span class="post-date">{new Date(firstPost.created_at).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                <form method="POST" class="inline-form ml-2">
+                  <input type="hidden" name="action" value="report_post" />
+                  <input type="hidden" name="post_id" value={firstPost.id} />
+                  <button type="submit" class="btn-report-mini" title="Signaler à la modération">⚠️ Signaler</button>
+                </form>
+              </div>
+            </div>
+            
+            <div class="post-content">
+              {firstPost.content}
+            </div>
+
+            <!-- Barre de réactions -->
+            <div class="reactions-bar">
+              {AVAILABLE_EMOJIS.map(emoji => {
+                const data = firstPost.reactions[emoji];
+                return (
+                  <form method="POST" class="reaction-form">
+                    <input type="hidden" name="action" value="react" />
+                    <input type="hidden" name="post_id" value={firstPost.id} />
+                    <button 
+                      type="submit" 
+                      name="emoji" 
+                      value={emoji} 
+                      class={`btn-reaction ${data.userReacted ? 'active' : ''}`}
+                      title="Cliquer pour réagir"
+                    >
+                      <span class="emoji-icon">{emoji}</span>
+                      {data.count > 0 && <span class="emoji-count">{data.count}</span>}
+                    </button>
+                  </form>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <!-- Réponses -->
+      {replies.map((p, idx) => (
+        <div class="post-item hud-panel" id={`post-${p.id}`}>
+          <div class="post-sidebar">
+            <span class="user-avatar">👤</span>
+            <span class="user-name">{p.username}</span>
+            <span class={`user-role-badge ${p.role === 'admin' ? 'role-admin' : 'role-user'}`}>
+              {p.role}
+            </span>
+          </div>
+          <div class="post-main">
+            <div class="post-header">
+              <span class="badge-post-type">REP #{idx + 1}</span>
+              <div class="post-header-actions">
+                <span class="post-date">{new Date(p.created_at).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                
+                {currentUser.role === 'admin' && (
+                  <form method="POST" class="inline-form ml-2">
+                    <input type="hidden" name="action" value="delete_post" />
+                    <input type="hidden" name="post_id" value={p.id} />
+                    <button type="submit" class="btn-delete-mini" onclick="return confirm('Supprimer ce message ?');" title="Supprimer par la modération">🗑️</button>
+                  </form>
+                )}
+
+                <form method="POST" class="inline-form ml-2">
+                  <input type="hidden" name="action" value="report_post" />
+                  <input type="hidden" name="post_id" value={p.id} />
+                  <button type="submit" class="btn-report-mini" title="Signaler à la modération">⚠️ Signaler</button>
+                </form>
+              </div>
+            </div>
+            
+            <div class="post-content">
+              {p.content}
+            </div>
+
+            <!-- Barre de réactions -->
+            <div class="reactions-bar">
+              {AVAILABLE_EMOJIS.map(emoji => {
+                const data = p.reactions[emoji];
+                return (
+                  <form method="POST" class="reaction-form">
+                    <input type="hidden" name="action" value="react" />
+                    <input type="hidden" name="post_id" value={p.id} />
+                    <button 
+                      type="submit" 
+                      name="emoji" 
+                      value={emoji} 
+                      class={`btn-reaction ${data.userReacted ? 'active' : ''}`}
+                      title="Cliquer pour réagir"
+                    >
+                      <span class="emoji-icon">{emoji}</span>
+                      {data.count > 0 && <span class="emoji-count">{data.count}</span>}
+                    </button>
+                  </form>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <!-- Formulaire de réponse -->
+    {topic.is_locked === 0 || currentUser.role === 'admin' ? (
+      <div class="hud-panel reply-card my-3">
+        <h2>Ajouter une transmission</h2>
+        <form method="POST" class="reply-form">
+          <input type="hidden" name="action" value="reply" />
+          <div class="hud-form-group">
+            <textarea class="hud-input hud-textarea" id="content" name="content" rows="4" placeholder="Saisissez votre réponse tactique..." required></textarea>
+          </div>
+          <button type="submit" class="hud-btn hud-btn-filled my-3">Envoyer la réponse</button>
+        </form>
+      </div>
+    ) : (
+      <div class="hud-panel locked-box text-center py-4 my-3">
+        <p class="text-muted mb-0">🔒 Les réponses sont fermées sur ce sujet.</p>
+      </div>
+    )}
+  </section>
+</Layout>
+
+<style>
+  .top-nav-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .back-link {
+    font-family: var(--font-sub);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #3ba0e3;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: #fff;
+  }
+
+  .admin-mod-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background-color: rgba(230, 95, 43, 0.08);
+    border: 1px solid rgba(230, 95, 43, 0.3);
+    border-radius: 4px;
+  }
+
+  .mod-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: #e65f2b;
+    letter-spacing: 1px;
+  }
+
+  .mod-form {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .hud-btn-mini {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    border: 1px solid rgba(193, 185, 127, 0.3);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 2px;
+  }
+
+  .hud-btn-mini:hover { border-color: #3ba0e3; color: #3ba0e3; background: rgba(59, 160, 227, 0.1); }
+  .btn-pinned-active { border-color: #ffb703; color: #ffb703; background: rgba(255, 183, 3, 0.15); }
+  .btn-locked-active { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.15); }
+  .btn-danger:hover { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+  .topic-header-bar {
+    border-bottom: 1px solid rgba(193, 185, 127, 0.2);
+    padding-bottom: 1rem;
+  }
+
+  .badges-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .badge-hud {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .badge-pinned {
+    border-color: #ffb703;
+    color: #ffb703;
+    background-color: rgba(255, 183, 3, 0.1);
+  }
+
+  .badge-locked {
+    border-color: #ef4444;
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+  }
+
+  .badge-ai {
+    border-color: #06b6d4;
+    color: #06b6d4;
+    background-color: rgba(6, 182, 212, 0.1);
+  }
+
+  .topic-page-title {
+    font-size: 2rem;
+    color: #fff;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  .topic-info {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    margin-top: 0.5rem;
+  }
+
+  .topic-info .author {
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+  }
+
+  .error-box {
+    background-color: rgba(230, 95, 43, 0.1);
+    border-color: var(--color-accent);
+    color: #fff;
+    padding: 1rem;
+  }
+
+  .success-box {
+    background-color: rgba(0, 255, 102, 0.05);
+    border-color: #00ff66;
+    color: #fff;
+    padding: 1rem;
+  }
+
+  .locked-banner {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    color: #ef4444;
+    padding: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+
+  .posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
+
+  .post-item {
+    display: flex;
+    background-color: var(--color-bg-card);
+    border: 1px solid rgba(193, 185, 127, 0.1);
+  }
+
+  .first-post-item {
+    border-left: 3px solid #3ba0e3;
+  }
+
+  .post-sidebar {
+    width: 140px;
+    padding: 1.5rem 1rem;
+    border-right: 1px solid rgba(193, 185, 127, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background-color: rgba(19, 22, 17, 0.3);
+    flex-shrink: 0;
+  }
+
+  .user-avatar {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .user-name {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    word-break: break-all;
+  }
+
+  .user-role-badge {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+    text-transform: uppercase;
+    margin-top: 0.5rem;
+    border-radius: 2px;
+  }
+
+  .role-admin {
+    border: 1px solid var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .role-user {
+    border: 1px solid var(--color-text-muted);
+    color: var(--color-text-muted);
+  }
+
+  .post-main {
+    padding: 1.5rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(193, 185, 127, 0.05);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .post-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .inline-form {
+    display: inline-block;
+  }
+
+  .btn-report-mini {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+  }
+
+  .btn-report-mini:hover {
+    color: #ffb703;
+    opacity: 1;
+  }
+
+  .btn-delete-mini {
+    background: transparent;
+    border: none;
+    color: #ef4444;
+    font-size: 0.85rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+  }
+
+  .btn-delete-mini:hover {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  .badge-post-type {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    letter-spacing: 1px;
+  }
+
+  .post-date {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .post-content {
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: var(--color-text);
+    white-space: pre-line;
+    margin-bottom: 1.5rem;
+  }
+
+  .reactions-bar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding-top: 0.75rem;
+    border-top: 1px dashed rgba(193, 185, 127, 0.1);
+  }
+
+  .reaction-form {
+    display: inline-block;
+  }
+
+  .btn-reaction {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    background: rgba(19, 22, 17, 0.5);
+    border: 1px solid rgba(193, 185, 127, 0.2);
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+  }
+
+  .btn-reaction:hover {
+    border-color: #3ba0e3;
+    background: rgba(59, 160, 227, 0.1);
+  }
+
+  .btn-reaction.active {
+    border-color: #3ba0e3;
+    background: rgba(59, 160, 227, 0.2);
+    box-shadow: 0 0 5px rgba(59, 160, 227, 0.3);
+  }
+
+  .emoji-count {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: #3ba0e3;
+  }
+
+  .reply-card {
+    padding: 2.5rem;
+    background-color: var(--color-bg-card);
+  }
+
+  .reply-card h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(193, 185, 127, 0.2);
+    padding-bottom: 0.5rem;
+  }
+
+  .reply-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hud-textarea {
+    resize: vertical;
+    font-family: var(--font-body);
+  }
+
+  .ml-2 { margin-left: 0.5rem; }
+
+  @media (max-width: 768px) {
+    .post-item {
+      flex-direction: column;
+    }
+
+    .post-sidebar {
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid rgba(193, 185, 127, 0.1);
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      text-align: left;
+    }
+
+    .user-avatar {
+      margin-bottom: 0;
+      font-size: 1.5rem;
+    }
+
+    .user-role-badge {
+      margin-top: 0;
+    }
+  }
+</style>

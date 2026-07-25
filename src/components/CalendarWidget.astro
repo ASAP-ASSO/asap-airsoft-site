@@ -1,0 +1,296 @@
+---
+interface EventWeather {
+  icon: string;
+  label: string;
+  minTemp: number;
+  maxTemp: number;
+}
+
+interface CalendarEvent {
+  title: string;
+  start: string;
+  isoDate: string;
+  time: string;
+  location: string;
+  description: string;
+  category: string;
+  weather?: EventWeather;
+}
+
+let events: CalendarEvent[] = [];
+let errorMsg = "";
+
+const getWeatherInfo = (code: number) => {
+  if (code === 0) return { icon: '☀️', label: 'Ensoleillé' };
+  if (code <= 3) return { icon: '⛅', label: 'Éclaircies' };
+  if (code <= 48) return { icon: '🌫️', label: 'Brouillard' };
+  if (code <= 67) return { icon: '🌧️', label: 'Pluie' };
+  if (code <= 82) return { icon: '🌧️', label: 'Averses' };
+  if (code >= 95) return { icon: '⛈️', label: 'Orage' };
+  return { icon: '☁️', label: 'Nuageux' };
+};
+
+// Open-Meteo 14-day forecast for Parc de Caubous
+let weatherDaily: { time: string[]; weathercode: number[]; temperature_2m_max: number[]; temperature_2m_min: number[] } | null = null;
+
+try {
+  const wRes = await fetch(
+    'https://api.open-meteo.com/v1/forecast?latitude=43.18&longitude=-0.25&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Europe%2FParis&forecast_days=14'
+  );
+  if (wRes.ok) {
+    const wData = await wRes.json();
+    if (wData && wData.daily) {
+      weatherDaily = wData.daily;
+    }
+  }
+} catch (e) {
+  console.error("Erreur météo API:", e);
+}
+
+try {
+  const calendarId = '221cd9f549c1f1a88c6f99b34d65feba6a225a0d8a520b58c5f71d169effeaa5@group.calendar.google.com';
+  const apiKey = import.meta.env.GOOGLE_CALENDAR_API_KEY || 'AIzaSyDESZ8vJgN7QVPGvqcbZX0OnpO1gDjHWFw';
+  const timeMin = new Date().toISOString();
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&singleEvents=true&orderBy=startTime&maxResults=9`;
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Erreur API Google: ${response.status}`);
+
+  const data = await response.json();
+
+  if (data.items) {
+    events = data.items.map((item: any) => {
+      let category = 'Général';
+      let title = item.summary || 'Événement sans titre';
+      if (title.includes(':')) {
+        const parts = title.split(':');
+        category = parts[0].trim();
+        title = parts.slice(1).join(':').trim();
+      }
+
+      const startDateTime = item.start.dateTime || item.start.date;
+      const endDateTime = item.end.dateTime || item.end.date;
+      const startDate = new Date(startDateTime);
+      const isoDate = startDate.toISOString().split('T')[0];
+
+      const formattedDate = startDate.toLocaleDateString('fr-FR', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+
+      let formattedTime = 'Toute la journée';
+      if (item.start.dateTime && item.end.dateTime) {
+        const startTime = new Date(startDateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const endTime   = new Date(endDateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        formattedTime = `${startTime} – ${endTime}`;
+      }
+
+      let weather: EventWeather | undefined = undefined;
+      if (weatherDaily && weatherDaily.time) {
+        const wIndex = weatherDaily.time.indexOf(isoDate);
+        if (wIndex !== -1) {
+          const wInfo = getWeatherInfo(weatherDaily.weathercode[wIndex]);
+          weather = {
+            icon: wInfo.icon,
+            label: wInfo.label,
+            minTemp: Math.round(weatherDaily.temperature_2m_min[wIndex]),
+            maxTemp: Math.round(weatherDaily.temperature_2m_max[wIndex])
+          };
+        }
+      }
+
+      return { title, start: formattedDate, isoDate, time: formattedTime, location: item.location || '', description: item.description || '', category, weather };
+    });
+  }
+} catch (e: any) {
+  console.error("Erreur calendrier Google:", e.message);
+  errorMsg = "Impossible de récupérer l'agenda. Consultez le Discord pour les prochaines dates.";
+}
+
+const categoryMeta: Record<string, { color: string; badge: string }> = {
+  'Milsim':     { color: 'var(--brand)',     badge: 'brand' },
+  'Dominical':  { color: 'var(--gold)',      badge: 'gold' },
+  'Formation':  { color: 'var(--blue-info)', badge: 'blue' },
+  'Événement':  { color: 'var(--ember)',     badge: 'ember' },
+  'Réunion':    { color: 'var(--text-muted)',badge: 'muted' },
+};
+
+const getCategoryMeta = (cat: string) => categoryMeta[cat] || { color: 'var(--brand)', badge: 'brand' };
+---
+
+<div class="calendar-widget">
+  {errorMsg ? (
+    <div class="glass cal-error text-center">
+      <p class="text-ember" style="font-size:var(--fs-lg);margin-bottom:var(--sp-3)">⚠</p>
+      <p>{errorMsg}</p>
+      <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="btn btn-primary mt-3">
+        Voir sur Discord
+      </a>
+    </div>
+  ) : events.length === 0 ? (
+    <div class="cal-empty-hero glass glass-shine">
+      <div class="cal-empty-icon" aria-hidden="true">📡</div>
+      <h3 class="text-bright">Aucune opération planifiée</h3>
+      <p>Le calendrier est vide pour l'instant — les prochaines dates sont annoncées sur Discord.</p>
+      <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="btn btn-primary mt-3">
+        Rejoindre le Discord ↗
+      </a>
+    </div>
+  ) : (
+    <div class="events-grid">
+      {events.map((event) => {
+        const meta = getCategoryMeta(event.category);
+        return (
+          <article class="event-card glass glass-shine glass--lift">
+            <div class="event-head">
+              <span class={`badge badge-${meta.badge}`}>{event.category}</span>
+              <span class="event-time font-mono">{event.time}</span>
+            </div>
+
+            <h3 class="event-title">{event.title}</h3>
+
+            <div class="event-meta">
+              <div class="event-meta-item">
+                <span class="event-meta-icon">📅</span>
+                <span>{event.start}</span>
+              </div>
+              {event.location && (
+                <div class="event-meta-item">
+                  <span class="event-meta-icon">📍</span>
+                  <span>{event.location}</span>
+                </div>
+              )}
+              {event.weather ? (
+                <div class="event-meta-item event-weather">
+                  <span class="event-meta-icon">{event.weather.icon}</span>
+                  <span class="weather-badge font-mono">{event.weather.minTemp}° / {event.weather.maxTemp}°C · {event.weather.label}</span>
+                </div>
+              ) : (
+                <div class="event-meta-item text-muted" style="font-size: var(--fs-xs);">
+                  <span class="event-meta-icon">🌤️</span>
+                  <span>Météo disponible ~14j avant</span>
+                </div>
+              )}
+            </div>
+
+            {event.description && (
+              <p class="event-desc">{event.description}</p>
+            )}
+
+            <div class="event-cat-bar" style={`background: ${meta.color}`} aria-hidden="true"></div>
+          </article>
+        );
+      })}
+    </div>
+  )}
+</div>
+
+<style>
+  .calendar-widget { width: 100%; }
+
+  .cal-error { padding: var(--sp-12) var(--sp-8); max-width: 600px; margin: 0 auto; }
+  .mt-3 { margin-top: var(--sp-5); }
+
+  .cal-empty-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--sp-12) var(--sp-8);
+    gap: var(--sp-4);
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  .cal-empty-icon { font-size: 3rem; }
+
+  .cal-empty-hero h3 { font-size: var(--fs-xl); }
+  .cal-empty-hero p { max-width: 400px; }
+
+
+  .events-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--sp-5);
+  }
+
+  .event-card {
+    position: relative;
+    padding: var(--card-pad);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    overflow: hidden;
+    transition: var(--t-spring);
+  }
+
+  .event-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+  }
+
+  .event-time {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .event-title {
+    font-size: var(--fs-lg);
+    color: var(--text-bright);
+    letter-spacing: 0.5px;
+    text-transform: none;
+    font-family: var(--font-title);
+  }
+
+  .event-meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .event-meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+  }
+
+  .event-weather {
+    color: var(--brand);
+  }
+
+  .weather-badge {
+    color: var(--brand);
+    font-weight: 700;
+  }
+
+  .event-meta-icon { font-size: 0.95rem; flex-shrink: 0; }
+
+  .event-desc {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--glass-border);
+    white-space: pre-line;
+    flex: 1;
+  }
+
+  /* Barre couleur catégorie en bas à gauche */
+  .event-cat-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+  }
+
+  .event-card:hover .event-cat-bar {
+    opacity: 1;
+    box-shadow: 0 0 10px currentColor;
+  }
+</style>

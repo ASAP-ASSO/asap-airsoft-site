@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /membres
+Disallow: /membres/
+Disallow: /forum
+Disallow: /forum/
+Disallow: /connexion
+Disallow: /deconnexion
+
+Sitemap: https://asap-airsoft.fr/sitemap.xml
+Crawl-delay: 1

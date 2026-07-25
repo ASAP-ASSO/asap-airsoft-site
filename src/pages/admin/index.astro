@@ -1,0 +1,670 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { db } from '../../db/index';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+const currentUser = Astro.locals.user!;
+
+let successMsg = "";
+let errorMsg = "";
+
+if (Astro.request.method === "POST") {
+  try {
+    const data = await Astro.request.formData();
+    const action = data.get("action") as string;
+
+    if (action === "add-user") {
+      const username = (data.get("username") as string || "").trim().toLowerCase();
+      const password = data.get("password") as string || "";
+      const isMilsimChecked = data.get("tag_milsim") === "on";
+
+      if (!username || !password) {
+        errorMsg = "Le nom d'utilisateur et le mot de passe sont requis.";
+      } else {
+        const existingRes = await db.execute({ sql: 'SELECT id FROM users WHERE username = ?', args: [username] });
+        const existing = existingRes.rows[0];
+        if (existing) {
+          errorMsg = `L'utilisateur "${username}" existe déjà.`;
+        } else {
+          const newUserId = crypto.randomUUID();
+          const hash = bcrypt.hashSync(password, 10);
+          const tags = JSON.stringify(isMilsimChecked ? ['milsim'] : []);
+          await db.execute({
+            sql: `INSERT INTO users (id, username, password_hash, role, tags) VALUES (?, ?, ?, 'user', ?)`,
+            args: [newUserId, username, hash, tags]
+          });
+          successMsg = `Compte adhérent "${username}" créé avec succès.`;
+        }
+      }
+    }
+
+    if (action === "toggle-milsim") {
+      const userId = data.get("user_id") as string;
+      const userRes = await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [userId] });
+      const user: any = userRes.rows[0];
+      if (user) {
+        let tagsArray: string[] = [];
+        try { tagsArray = JSON.parse(user.tags || '[]'); } catch (e) {}
+        if (tagsArray.includes('milsim')) {
+          tagsArray = tagsArray.filter(t => t !== 'milsim');
+        } else {
+          tagsArray.push('milsim');
+        }
+        await db.execute({ sql: 'UPDATE users SET tags = ? WHERE id = ?', args: [JSON.stringify(tagsArray), userId] });
+        successMsg = `Statut Milsim de "${user.username}" mis à jour.`;
+      }
+    }
+
+    if (action === "toggle-admin") {
+      const userId = data.get("user_id") as string;
+      if (userId === currentUser.id) {
+        errorMsg = "Action interdite : vous ne pouvez pas révoquer vos propres droits admin.";
+      } else {
+        const userRes = await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [userId] });
+        const user: any = userRes.rows[0];
+        if (user) {
+          const newRole = user.role === 'admin' ? 'user' : 'admin';
+          await db.execute({ sql: 'UPDATE users SET role = ? WHERE id = ?', args: [newRole, userId] });
+          successMsg = `Rôle de "${user.username}" changé en : ${newRole}.`;
+        }
+      }
+    }
+
+    if (action === "delete-user") {
+      const userId = data.get("user_id") as string;
+      if (userId === currentUser.id) {
+        errorMsg = "Action interdite : vous ne pouvez pas supprimer votre propre compte.";
+      } else {
+        const userRes = await db.execute({ sql: 'SELECT username FROM users WHERE id = ?', args: [userId] });
+        const user: any = userRes.rows[0];
+        if (user) {
+          await db.execute({ sql: 'DELETE FROM users WHERE id = ?', args: [userId] });
+          successMsg = `Compte de "${user.username}" supprimé définitivement.`;
+        }
+      }
+    }
+
+    if (action === "delete-registration") {
+      const regId = data.get("registration_id") as string;
+      if (regId) {
+        await db.execute({ sql: 'DELETE FROM guest_registrations WHERE id = ?', args: [regId] });
+        successMsg = "Réservation d'invité supprimée avec succès.";
+      }
+    }
+  } catch (e: any) {
+    console.error("Erreur action admin:", e);
+    errorMsg = "Une erreur système est survenue.";
+  }
+}
+
+const usersRes = await db.execute('SELECT * FROM users ORDER BY created_at DESC');
+const users = usersRes.rows as any[];
+
+const guestRegistrationsRes = await db.execute('SELECT * FROM guest_registrations ORDER BY created_at DESC');
+const guestRegistrations = guestRegistrationsRes.rows as any[];
+---
+
+<Layout title="Panel Administration" description="Panel d'administration ASAP Airsoft.">
+  <div class="admin-page container">
+
+    <!-- Header -->
+    <div class="admin-header reveal">
+      <div>
+        <span class="section-label">Panneau de contrôle</span>
+        <h1><span class="text-gold">Administration</span> ASAP</h1>
+        <p class="text-muted" style="font-size:var(--fs-sm);margin-top:var(--sp-2)">
+          Connecté en tant que <span class="font-mono text-gold">{currentUser.username}</span>
+        </p>
+      </div>
+      <div class="admin-meta">
+        <div class="status">
+          <span class="status-dot status-dot--on"></span>
+          <span>{users.length} adhérent{users.length > 1 ? 's' : ''} enregistré{users.length > 1 ? 's' : ''}</span>
+        </div>
+        <a href="/membres" class="btn btn-ghost btn-sm">← Mon profil</a>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    {successMsg && (
+      <div class="alert alert-success reveal" role="status">
+        <span>✔</span><span>{successMsg}</span>
+      </div>
+    )}
+    {errorMsg && (
+      <div class="alert alert-error reveal" role="alert">
+        <span>⚠</span><span>{errorMsg}</span>
+      </div>
+    )}
+
+    <!-- Grid -->
+    <div class="admin-grid">
+
+      <!-- Tableau membres -->
+      <section class="glass glass-shine members-panel reveal" aria-labelledby="members-title">
+        <div class="panel-header">
+          <div>
+            <h2 id="members-title" class="panel-title">Adhérents ({users.length})</h2>
+            <span class="badge badge-muted font-mono" style="margin-top:4px;display:inline-block">Dernière inscription : {users[0]?.username || '—'}</span>
+          </div>
+
+          <!-- Live Search & Filters -->
+          <div class="table-controls">
+            <input type="text" id="admin-user-search" class="form-input form-input-sm" placeholder="🔍 Rechercher pseudo..." aria-label="Rechercher un adhérent" />
+            <div class="filter-pills" role="radiogroup" aria-label="Filtrer par statut">
+              <button type="button" class="filter-pill active" data-filter="all">Tous</button>
+              <button type="button" class="filter-pill" data-filter="admin">Admins</button>
+              <button type="button" class="filter-pill" data-filter="milsim">Milsim</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="admin-table" id="admin-users-table" aria-label="Liste des adhérents">
+            <thead>
+              <tr>
+                <th>Identifiant</th>
+                <th>Rôle</th>
+                <th>Certifications</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => {
+                let tags: string[] = [];
+                try { tags = JSON.parse(u.tags || '[]'); } catch(e){}
+                const isCurrentUser = u.id === currentUser.id;
+                const isMilsim = tags.includes('milsim');
+                const isAdmin = u.role === 'admin';
+                return (
+                  <tr 
+                    class:list={{ 'row-self': isCurrentUser }} 
+                    data-username={u.username}
+                    data-role={u.role}
+                    data-milsim={isMilsim ? 'true' : 'false'}
+                  >
+                    <td class="cell-username">
+                      <span class="font-mono text-bright">{u.username}</span>
+                      {isCurrentUser && <span class="badge badge-muted" style="font-size:0.6rem;margin-left:4px">vous</span>}
+                    </td>
+                    <td>
+                      {isAdmin
+                        ? <span class="badge badge-gold">Admin</span>
+                        : <span class="badge badge-muted">Adhérent</span>
+                      }
+                    </td>
+                    <td>
+                      <div class="tags-wrap">
+                        {tags.map(t => <span class="badge badge-brand">{t}</span>)}
+                        {tags.length === 0 && <span class="text-muted" style="font-size:var(--fs-xs)">Aucune</span>}
+                      </div>
+                    </td>
+                    <td class="cell-actions">
+                      <!-- Toggle Milsim -->
+                      <form method="POST">
+                        <input type="hidden" name="action" value="toggle-milsim" />
+                        <input type="hidden" name="user_id" value={u.id} />
+                        <button type="submit" class:list={['btn btn-sm', isMilsim ? 'btn-primary' : 'btn-ghost']}>
+                          {isMilsim ? '↩ Milsim' : '+ Milsim'}
+                        </button>
+                      </form>
+                      <!-- Toggle Admin -->
+                      <form method="POST">
+                        <input type="hidden" name="action" value="toggle-admin" />
+                        <input type="hidden" name="user_id" value={u.id} />
+                        <button type="submit" class="btn btn-gold btn-sm" disabled={isCurrentUser}>
+                          {isAdmin ? '↩ Admin' : '+ Admin'}
+                        </button>
+                      </form>
+                      <!-- Delete with Custom HUD Modal -->
+                      <form method="POST" class="delete-user-form">
+                        <input type="hidden" name="action" value="delete-user" />
+                        <input type="hidden" name="user_id" value={u.id} />
+                        <button type="button" class="btn btn-danger btn-sm btn-delete-trigger" disabled={isCurrentUser} data-target-username={u.username}>
+                          Suppr.
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p id="no-search-results" class="text-muted text-center py-6" style="display:none;">Aucun adhérent ne correspond à la recherche.</p>
+        </div>
+      </section>
+
+      <!-- Sidebar : créer un compte -->
+      <section class="glass glass-shine add-panel reveal reveal-delay-2" aria-labelledby="add-title">
+        <div class="panel-header">
+          <h2 id="add-title" class="panel-title">Créer un Compte</h2>
+        </div>
+
+        <form method="POST" class="add-form">
+          <input type="hidden" name="action" value="add-user" />
+
+          <div class="form-group">
+            <label class="form-label" for="new-username">Nom d'utilisateur</label>
+            <input class="form-input" type="text" id="new-username" name="username" required autocomplete="off" placeholder="nouveau_pseudo" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="new-password">Mot de passe initial</label>
+            <input class="form-input" type="password" id="new-password" name="password" required placeholder="••••••••" />
+          </div>
+
+          <label class="form-checkbox">
+            <input type="checkbox" id="tag_milsim" name="tag_milsim" />
+            <span>Attribuer la certification <strong class="text-brand">Milsim</strong></span>
+          </label>
+
+          <button type="submit" class="btn btn-filled w-full mt-4">
+            Créer le profil adhérent
+          </button>
+        </form>
+
+        <div class="divider"></div>
+
+        <div class="admin-info">
+          <span class="section-label" style="font-size:0.65rem">Accès rapides</span>
+          <a href="/forum" class="btn btn-primary btn-sm w-full">Forum Milsim</a>
+          <a href="/nosparties" class="btn btn-ghost btn-sm w-full mt-2">Agenda →</a>
+          <a href="/deconnexion" class="btn btn-danger btn-sm w-full mt-2">Déconnexion</a>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Section Inscriptions Invités en direct -->
+    <section class="admin-card glass glass-shine reveal mt-8 mb-12">
+      <div class="card-header">
+        <div>
+          <span class="section-label">// RÉSERVATIONS INVITÉS</span>
+          <h2 class="title-gradient" style="font-size:var(--fs-xl)">Inscriptions aux Parties ({guestRegistrations.length})</h2>
+        </div>
+      </div>
+
+      {guestRegistrations.length > 0 ? (
+        <div class="table-wrap mt-4">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Date Session</th>
+                <th>Nom & Prénom</th>
+                <th>Pseudo</th>
+                <th>Option / Tarif</th>
+                <th>Contact</th>
+                <th>Inscrit le</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {guestRegistrations.map((reg: any) => (
+                <tr>
+                  <td><span class="badge badge-brand">{reg.event_date}</span></td>
+                  <td><strong>{reg.name}</strong></td>
+                  <td class="font-mono text-gold">{reg.pseudo || '—'}</td>
+                  <td><span class="badge badge-gold">{reg.pack_option}</span></td>
+                  <td class="font-mono text-sm">
+                    <div>{reg.email}</div>
+                    <div class="text-muted">{reg.phone}</div>
+                  </td>
+                  <td class="font-mono text-xs text-muted">{reg.created_at}</td>
+                  <td>
+                    <form method="POST" inline style="display:inline">
+                      <input type="hidden" name="action" value="delete-registration" />
+                      <input type="hidden" name="registration_id" value={reg.id} />
+                      <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Supprimer cette réservation ?');">
+                        Supprimer
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div class="text-center p-6 text-muted">
+          Aucune réservation d'invité enregistrée pour le moment.
+        </div>
+      )}
+    </section>
+  </div>
+
+  <!-- HUD Custom Delete Confirmation Modal -->
+  <div id="hud-delete-modal" class="hud-modal-overlay" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="modal-hud-title">
+    <div class="hud-modal-content glass glass-shine">
+      <div class="hud-modal-header">
+        <span class="status-dot status-dot--on" style="background:#e65f2b;box-shadow:0 0 8px #e65f2b"></span>
+        <h3 id="modal-hud-title" class="font-mono text-bright">// CONFIRMATION_DESTRUCTION</h3>
+      </div>
+      <div class="hud-modal-body">
+        <p>Êtes-vous sûr de vouloir supprimer définitivement l'adhérent <strong id="hud-modal-target-user" class="text-brand font-mono"></strong> ?</p>
+        <p class="text-muted text-xs mt-2">⚠ Cette action est irréversible. Toutes les données associées seront purgées.</p>
+      </div>
+      <div class="hud-modal-actions">
+        <button type="button" id="hud-modal-cancel" class="btn btn-ghost btn-sm">Annuler [ESC]</button>
+        <button type="button" id="hud-modal-confirm" class="btn btn-danger btn-sm">Confirmer la suppression</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client JavaScript for Live Filter & Modal -->
+  <script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Live Filter & Search
+      const searchInput = document.getElementById('admin-user-search');
+      const filterPills = document.querySelectorAll('.filter-pill');
+      const rows = document.querySelectorAll('#admin-users-table tbody tr');
+      const noResultsMsg = document.getElementById('no-search-results');
+
+      let currentFilter = 'all';
+      let currentQuery = '';
+
+      function filterTable() {
+        let visibleCount = 0;
+        rows.forEach(row => {
+          const username = (row.getAttribute('data-username') || '').toLowerCase();
+          const role = row.getAttribute('data-role') || '';
+          const milsim = row.getAttribute('data-milsim') === 'true';
+
+          const matchesSearch = username.includes(currentQuery.toLowerCase());
+          let matchesFilter = true;
+
+          if (currentFilter === 'admin') matchesFilter = role === 'admin';
+          if (currentFilter === 'milsim') matchesFilter = milsim;
+
+          if (matchesSearch && matchesFilter) {
+            row.style.display = '';
+            visibleCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        });
+
+        if (noResultsMsg) {
+          noResultsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          currentQuery = e.target.value;
+          filterTable();
+        });
+      }
+
+      filterPills.forEach(pill => {
+        pill.addEventListener('click', () => {
+          filterPills.forEach(p => p.classList.remove('active'));
+          pill.classList.add('active');
+          currentFilter = pill.getAttribute('data-filter') || 'all';
+          filterTable();
+        });
+      });
+
+      // 2. HUD Delete Confirmation Modal
+      const modal = document.getElementById('hud-delete-modal');
+      const targetUserSpan = document.getElementById('hud-modal-target-user');
+      const cancelBtn = document.getElementById('hud-modal-cancel');
+      const confirmBtn = document.getElementById('hud-modal-confirm');
+      let pendingForm = null;
+
+      document.querySelectorAll('.btn-delete-trigger').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const form = btn.closest('form');
+          const username = btn.getAttribute('data-target-username') || '';
+          if (form && modal) {
+            pendingForm = form;
+            if (targetUserSpan) targetUserSpan.textContent = '@' + username;
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+          }
+        });
+      });
+
+      function closeModal() {
+        if (modal) {
+          modal.style.display = 'none';
+          modal.setAttribute('aria-hidden', 'true');
+        }
+        pendingForm = null;
+      }
+
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          if (pendingForm) {
+            pendingForm.submit();
+          }
+          closeModal();
+        });
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+          closeModal();
+        }
+      });
+    });
+  </script>
+</Layout>
+
+<style>
+  .admin-page {
+    padding-block: var(--sp-12) var(--sp-24);
+  }
+
+  .w-full { width: 100%; }
+  .mt-2  { margin-top: var(--sp-3); }
+  .mt-4  { margin-top: var(--sp-6); }
+
+  /* Header */
+  .admin-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-6);
+    margin-bottom: var(--sp-8);
+    padding-bottom: var(--sp-6);
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+  }
+
+  h1 { font-size: var(--fs-2xl); }
+
+  .admin-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--sp-3);
+  }
+
+  /* Controls Search & Filter */
+  .table-controls {
+    display: flex;
+    gap: var(--sp-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .form-input-sm {
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+    max-width: 200px;
+  }
+
+  .filter-pills {
+    display: flex;
+    gap: 4px;
+    background: rgba(0,0,0,0.3);
+    padding: 3px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--glass-border);
+  }
+
+  .filter-pill {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-sub);
+    font-size: var(--fs-xs);
+    padding: 3px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .filter-pill:hover,
+  .filter-pill.active {
+    color: var(--text-bright);
+    background: var(--brand-dark, #2b3323);
+  }
+
+  .filter-pill.active {
+    border: 1px solid var(--brand-gold, #c1b97f);
+  }
+
+  /* Grid */
+  .admin-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: var(--sp-6);
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .admin-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Panels */
+  .members-panel,
+  .add-panel {
+    padding: var(--card-pad);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    padding-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .panel-title {
+    font-size: var(--fs-lg);
+    color: var(--text-bright);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0;
+  }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-sm);
+  }
+
+  .admin-table th {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    padding: var(--sp-3) var(--sp-4);
+    text-align: left;
+    border-bottom: 1px solid var(--glass-border);
+    white-space: nowrap;
+  }
+
+  .admin-table td {
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    vertical-align: middle;
+  }
+
+  .admin-table tr:hover td {
+    background: rgba(255,255,255,0.02);
+  }
+
+  .row-self td {
+    background: rgba(0,212,170,0.02);
+  }
+
+  .cell-username { white-space: nowrap; }
+  .tags-wrap { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+
+  .cell-actions {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+  }
+
+  .cell-actions form { display: contents; }
+
+  /* Add form */
+  .add-form { display: flex; flex-direction: column; gap: 0; }
+
+  /* Admin info shortcuts */
+  .admin-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .admin-info .section-label { margin-bottom: var(--sp-2); }
+
+  /* HUD Delete Modal */
+  .hud-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 6, 10, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-4);
+  }
+
+  .hud-modal-content {
+    max-width: 480px;
+    width: 100%;
+    padding: var(--sp-6);
+    border: 1px solid rgba(230, 95, 43, 0.4);
+    box-shadow: 0 0 30px rgba(230, 95, 43, 0.2);
+  }
+
+  .hud-modal-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    padding-bottom: var(--sp-3);
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .hud-modal-header h3 { font-size: var(--fs-md); margin: 0; }
+
+  .hud-modal-body p { margin: 0; font-size: var(--fs-sm); }
+
+  .hud-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--sp-3);
+    margin-top: var(--sp-6);
+  }
+</style>

@@ -1,0 +1,12 @@
+---
+import { destroySession } from '../db/auth';
+
+const sessionId = Astro.cookies.get('session_id')?.value || '';
+if (sessionId) {
+  destroySession(sessionId);
+  Astro.cookies.delete('session_id', { path: '/' });
+}
+
+return Astro.redirect('/');
+---
+<!-- Endpoint de déconnexion -->

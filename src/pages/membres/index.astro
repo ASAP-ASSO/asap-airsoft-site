@@ -1,0 +1,358 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { db } from '../../db/index';
+import bcrypt from 'bcryptjs';
+
+const user = Astro.locals.user!;
+const queryError = Astro.url.searchParams.get('error');
+
+let successMsg = "";
+let errorMsg = queryError === 'milsim_only' ? "Accès refusé : cet espace est réservé aux membres certifiés Milsim." : "";
+
+if (Astro.request.method === "POST") {
+  try {
+    const data = await Astro.request.formData();
+    const action = data.get("action") as string;
+
+    if (action === "update-password") {
+      const currentPassword = data.get("current_password") as string || "";
+      const newPassword = data.get("new_password") as string || "";
+      const confirmPassword = data.get("confirm_password") as string || "";
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        errorMsg = "Tous les champs du mot de passe sont requis.";
+      } else if (newPassword !== confirmPassword) {
+        errorMsg = "Le nouveau mot de passe et sa confirmation ne correspondent pas.";
+      } else if (newPassword.length < 6) {
+        errorMsg = "Le nouveau mot de passe doit contenir au moins 6 caractères.";
+      } else {
+        const dbUserRes = await db.execute({ sql: 'SELECT password_hash FROM users WHERE id = ?', args: [user.id] });
+        const dbUser: any = dbUserRes.rows[0];
+        if (dbUser && bcrypt.compareSync(currentPassword, dbUser.password_hash)) {
+          const newHash = bcrypt.hashSync(newPassword, 10);
+          await db.execute({ sql: 'UPDATE users SET password_hash = ? WHERE id = ?', args: [newHash, user.id] });
+          successMsg = "Votre mot de passe a été mis à jour avec succès.";
+        } else {
+          errorMsg = "Le mot de passe actuel est incorrect.";
+        }
+      }
+    }
+  } catch (e: any) {
+    console.error("Erreur mise à jour MDP:", e);
+    errorMsg = "Une erreur système est survenue.";
+  }
+}
+
+let parsedTags: string[] = [];
+try {
+  parsedTags = JSON.parse(user.tags || '[]');
+} catch (e) {}
+
+const isMilsim = parsedTags.includes('milsim') || user.role === 'admin';
+const isAdmin = user.role === 'admin';
+
+const joinDate = new Date(user.created_at).toLocaleDateString('fr-FR', {
+  day: 'numeric', month: 'long', year: 'numeric'
+});
+---
+
+<Layout title="Espace Adhérent" description="Votre espace personnel ASAP Airsoft.">
+  <div class="dashboard-page container">
+    <!-- Header -->
+    <div class="dash-header reveal">
+      <div class="dash-identity">
+        <div class="avatar-wrap glass">
+          <span class="avatar-letter">{user.username.charAt(0).toUpperCase()}</span>
+        </div>
+        <div>
+          <span class="section-label">Espace Adhérent</span>
+          <h1 class="dash-username title-gradient">{user.username}</h1>
+          <div class="dash-badges">
+            {isAdmin && <span class="badge badge-gold">Administrateur</span>}
+            {isMilsim && !isAdmin && <span class="badge badge-brand">Milsim Certifié</span>}
+            {!isMilsim && !isAdmin && <span class="badge badge-muted">Adhérent</span>}
+            {parsedTags.map(tag => <span class="badge badge-brand">{tag}</span>)}
+          </div>
+        </div>
+      </div>
+
+      <div class="status">
+        <span class="status-dot status-dot--on"></span>
+        <span>Session active · {joinDate}</span>
+      </div>
+    </div>
+
+    {successMsg && (
+      <div class="alert alert-success reveal mb-6" role="status">
+        <span>✔</span><span>{successMsg}</span>
+      </div>
+    )}
+    {errorMsg && (
+      <div class="alert alert-error reveal mb-6" role="alert">
+        <span>⚠</span><span>{errorMsg}</span>
+      </div>
+    )}
+
+    <!-- Grid accès -->
+    <div class="access-grid">
+
+      <!-- Profil Card -->
+      <div class="glass glass-shine dash-card reveal">
+        <h2 class="dash-card-title">Fiche Individuelle</h2>
+        <div class="profile-rows">
+          <div class="profile-row">
+            <span class="profile-label">Identifiant</span>
+            <span class="profile-value font-mono text-bright">{user.username}</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-label">Rôle</span>
+            <span class="profile-value">
+              {isAdmin
+                ? <span class="badge badge-gold">Administrateur</span>
+                : <span class="badge badge-muted">Adhérent</span>
+              }
+            </span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-label">Certifications</span>
+            <span class="profile-value">
+              {parsedTags.length > 0
+                ? parsedTags.map(t => <span class="badge badge-brand">{t}</span>)
+                : <span class="text-muted" style="font-size:var(--fs-sm)">Aucune</span>
+              }
+            </span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-label">Membre depuis</span>
+            <span class="profile-value font-mono text-brand">{joinDate}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accès Forum -->
+      <div class:list={['glass glass-shine dash-card reveal reveal-delay-1', { 'is-locked': !isMilsim }]}>
+        <div class="access-header">
+          <span class="access-icon">{isMilsim ? '💬' : '🔒'}</span>
+          <div>
+            <h2 class="dash-card-title">Forum Milsim Privé</h2>
+            <span class="badge badge-brand">Accès restreint</span>
+          </div>
+        </div>
+        {isMilsim ? (
+          <>
+            <p class="access-desc">Briefings opérationnels, tactiques et débats réservés aux opérateurs certifiés.</p>
+            <a href="/forum" class="btn btn-primary btn-sm mt-auto">Accéder au Forum →</a>
+          </>
+        ) : (
+          <>
+            <p class="access-desc">Requiert la certification <strong class="text-brand">Milsim</strong> attribuée par un administrateur.</p>
+            <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm mt-auto">
+              Demander sur Discord
+            </a>
+          </>
+        )}
+      </div>
+
+      <!-- Agenda -->
+      <div class="glass glass-shine dash-card reveal reveal-delay-2">
+        <div class="access-header">
+          <span class="access-icon">📅</span>
+          <div>
+            <h2 class="dash-card-title">Prochains Événements</h2>
+            <span class="badge badge-gold">Ouvert</span>
+          </div>
+        </div>
+        <p class="access-desc">Consultez le planning complet et inscrivez-vous aux prochaines opérations.</p>
+        <a href="/nosparties" class="btn btn-primary btn-sm mt-auto">Voir l'agenda →</a>
+      </div>
+
+      <!-- Admin (seulement si admin) -->
+      {isAdmin && (
+        <div class="glass glass-shine dash-card dash-card--admin reveal reveal-delay-3">
+          <div class="access-header">
+            <span class="access-icon">⚙️</span>
+            <div>
+              <h2 class="dash-card-title">Administration</h2>
+              <span class="badge badge-gold">Admin uniquement</span>
+            </div>
+          </div>
+          <p class="access-desc">Gestion des adhérents, attributions de certifications et tableau de bord administrateur.</p>
+          <a href="/admin" class="btn btn-gold btn-sm mt-auto">Panneau admin →</a>
+        </div>
+      )}
+
+      <!-- Changer de Mot de Passe -->
+      <div class="glass glass-shine dash-card reveal reveal-delay-3" style="grid-column: 1 / -1;">
+        <div class="access-header">
+          <span class="access-icon">🔑</span>
+          <div>
+            <h2 class="dash-card-title">Sécurité & Mot de Passe</h2>
+            <span class="badge badge-muted">Autonomie Compte</span>
+          </div>
+        </div>
+        <form method="POST" class="mt-2" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:var(--sp-4);align-items:end;">
+          <input type="hidden" name="action" value="update-password" />
+
+          <div>
+            <label class="form-label" for="current_password" style="font-size:var(--fs-xs)">Mot de passe actuel</label>
+            <input class="form-input" type="password" id="current_password" name="current_password" required placeholder="••••••••" />
+          </div>
+
+          <div>
+            <label class="form-label" for="new_password" style="font-size:var(--fs-xs)">Nouveau mot de passe</label>
+            <input class="form-input" type="password" id="new_password" name="new_password" required placeholder="••••••••" minlength="6" />
+          </div>
+
+          <div>
+            <label class="form-label" for="confirm_password" style="font-size:var(--fs-xs)">Confirmer le mot de passe</label>
+            <input class="form-input" type="password" id="confirm_password" name="confirm_password" required placeholder="••••••••" minlength="6" />
+          </div>
+
+          <div>
+            <button type="submit" class="btn btn-filled w-full">
+              Mettre à jour le mot de passe
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- Déconnexion -->
+    <div class="dash-footer reveal">
+      <a href="/deconnexion" class="btn btn-danger btn-sm">Déconnexion</a>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .dashboard-page {
+    padding-block: var(--sp-12) var(--sp-24);
+    max-width: 1000px;
+  }
+
+  /* Header */
+  .dash-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-6);
+    margin-bottom: var(--sp-8);
+    padding-bottom: var(--sp-8);
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .dash-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-5);
+  }
+
+  .avatar-wrap {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--r-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .avatar-letter {
+    font-family: var(--font-title);
+    font-size: var(--fs-2xl);
+    font-weight: 900;
+    color: var(--brand);
+  }
+
+  .dash-username {
+    font-size: var(--fs-2xl);
+    margin-bottom: var(--sp-2);
+    line-height: 1;
+  }
+
+  .dash-badges {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+  }
+
+  /* Grid */
+  .access-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--sp-5);
+    margin-bottom: var(--sp-10);
+  }
+
+  .dash-card {
+    padding: var(--card-pad);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    transition: var(--t-spring);
+  }
+
+  .dash-card:hover {
+    border-color: var(--glass-border-h);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md), var(--glow-brand-lg);
+  }
+
+  .dash-card.is-locked {
+    opacity: 0.65;
+    filter: saturate(0.5);
+  }
+
+  .dash-card--admin { border-color: rgba(201,168,76,0.25); }
+  .dash-card--admin:hover { box-shadow: var(--shadow-md), var(--glow-gold-sm); }
+
+  .dash-card-title {
+    font-size: var(--fs-lg);
+    color: var(--text-bright);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  /* Profile rows */
+  .profile-rows { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+  .profile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding: var(--sp-3);
+    background: rgba(255,255,255,0.02);
+    border-radius: var(--r-sm);
+    border: 1px solid var(--glass-border);
+  }
+
+  .profile-label {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+
+  .profile-value { font-size: var(--fs-sm); }
+
+  /* Access card */
+  .access-header { display: flex; align-items: center; gap: var(--sp-4); }
+  .access-icon { font-size: 1.8rem; flex-shrink: 0; }
+  .access-desc { font-size: var(--fs-sm); margin: 0; flex: 1; }
+
+  .mt-auto { margin-top: auto; }
+
+  /* Footer */
+  .dash-footer {
+    padding-top: var(--sp-8);
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: flex-end;
+  }
+</style>

@@ -1,0 +1,74 @@
+---
+import Layout from '../layouts/Layout.astro';
+import CalendarWidget from '../components/CalendarWidget.astro';
+import GuestRegistrationForm from '../components/GuestRegistrationForm.astro';
+import CaubousMap from '../components/CaubousMap.astro';
+import LiveRegistrationsWidget from '../components/LiveRegistrationsWidget.astro';
+---
+
+<Layout
+  title="Agenda des Parties Airsoft – Parc de Caubous"
+  description="Retrouvez le calendrier officiel des opérations ASAP Airsoft au Parc de Caubous (Béarn 64). Météo en direct, réservation de place et prêt de matériel."
+>
+  <div class="page-header">
+    <div class="container">
+      <span class="section-label">Planning officiel · Parc de Caubous</span>
+      <h1 class="title-gradient">Agenda des Parties</h1>
+      <p class="page-desc">Retrouvez toutes les opérations ASAP — Milsim, dominicales et événements au Parc de Caubous.</p>
+
+      <div class="status mt-3">
+        <span class="status-dot status-dot--on"></span>
+        <span>Météo & Calendrier synchronisés en temps réel</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="container page-content">
+    <!-- 1. Participants inscrits en premier -->
+    <LiveRegistrationsWidget />
+
+    <!-- 2. Calendrier -->
+    <CalendarWidget />
+
+    <!-- 3. Inscription rapide -->
+    <GuestRegistrationForm />
+
+    <!-- 4. Terrain officiel -->
+    <CaubousMap />
+
+    <div class="discord-cta glass glass-shine reveal text-center">
+      <span class="section-label" style="justify-content:center">Communauté</span>
+      <h2 class="text-bright">Rejoindre la Communauté Discord</h2>
+      <p class="mt-3">
+        Pour discuter avec les joueurs, organiser des covoiturages pour le Parc de Caubous et suivre l'actualité Milsim, rejoignez notre serveur officiel.
+      </p>
+      <a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer" class="btn btn-gold btn-lg mt-4">
+        Rejoindre le Discord ASAP ↗
+      </a>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .page-header {
+    padding-block: var(--sp-16) var(--sp-8);
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,212,170,0.07) 0%, transparent 65%);
+    border-bottom: 1px solid var(--glass-border);
+    margin-bottom: var(--sp-12);
+  }
+
+  h1 { font-size: var(--fs-3xl); }
+  .page-desc { font-size: var(--fs-lg); max-width: 600px; margin-top: var(--sp-3); }
+  .mt-3 { margin-top: var(--sp-4); }
+  .mt-4 { margin-top: var(--sp-6); }
+
+  .page-content { padding-bottom: var(--sp-24); }
+
+  .discord-cta {
+    margin-top: var(--sp-16);
+    padding: clamp(2rem, 4vw, 4rem);
+    max-width: 700px;
+    margin-inline: auto;
+  }
+</style>

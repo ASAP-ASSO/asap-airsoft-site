@@ -1,0 +1,614 @@
+---
+import '../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+}
+
+const {
+  title,
+  description = "ASAP Airsoft - Association Sportive Airsoft Pyrénéenne à Nay (64). Milsim, parties dominicales & événements.",
+  image = "/tactical_terrain.webp"
+} = Astro.props;
+
+const user = Astro.locals.user;
+const currentPath = Astro.url.pathname;
+const isActive = (path: string) => {
+  if (path === '/') return currentPath === '/';
+  return currentPath.startsWith(path);
+};
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#04060a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="canonical" href={new URL(currentPath, Astro.site || 'https://asap-airsoft.fr').href} />
+
+    <!-- Open Graph / Social -->
+    <meta property="og:title" content={`${title} | ASAP Airsoft Nay (64)`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={new URL(currentPath, Astro.site || 'https://asap-airsoft.fr').href} />
+    <meta property="og:image" content={new URL(image, Astro.site || 'https://asap-airsoft.fr').href} />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="ASAP Airsoft" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={`${title} | ASAP Airsoft Nay (64)`} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL(image, Astro.site || 'https://asap-airsoft.fr').href} />
+
+    <!-- Preload Critical Fonts for LCP optimization -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} | ASAP Airsoft Nay (64)</title>
+    <ClientRouter />
+
+    <!-- Schema.org Organization / SportsClub / Machine Experience (MX) -->
+    <script type="application/ld+json" is:inline>
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": ["SportsClub", "LocalBusiness"],
+            "@id": "https://asap-airsoft.fr/#organization",
+            "name": "ASAP Airsoft",
+            "alternateName": "Association Sportive Airsoft Pyrénéenne",
+            "url": "https://asap-airsoft.fr",
+            "logo": "https://asap-airsoft.fr/favicon.svg",
+            "image": "https://asap-airsoft.fr/tactical_terrain.webp",
+            "description": "Association d'airsoft à Nay (64), Béarn. Parties dominicales et opérations Milsim au Parc de Caubous, Pyrénées-Atlantiques.",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Nay",
+              "postalCode": "64800",
+              "addressRegion": "Pyrénées-Atlantiques",
+              "addressCountry": "FR"
+            },
+            "geo": {
+              "@type": "GeoCoordinates",
+              "latitude": 43.1812,
+              "longitude": -0.2625
+            },
+            "openingHours": "Su 08:30-17:00",
+            "priceRange": "10€–25€",
+            "sameAs": [
+              "https://www.facebook.com/profile.php?id=61552591082020",
+              "https://www.instagram.com/asap64800/",
+              "https://discord.gg/uXB4TcP7Yy"
+            ]
+          },
+          {
+            "@type": "SportsActivityLocation",
+            "@id": "https://asap-airsoft.fr/#caubous",
+            "name": "Terrain de Caubous (ASAP Airsoft)",
+            "description": "Terrain boisé CQB et forêt tactique de 15 hectares à Caubous (64).",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Caubous",
+              "postalCode": "64800",
+              "addressRegion": "Pyrénées-Atlantiques",
+              "addressCountry": "FR"
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+    <!-- NAVBAR GLASS -->
+    <header class="navbar" role="banner">
+      <div class="container nav-container">
+        <a href="/" class="brand-logo" aria-label="ASAP Airsoft Accueil">
+          <span class="logo-badge">ASAP</span>
+          <div class="logo-text">
+            <span class="logo-title">AIRSOFT</span>
+            <span class="logo-sub">NAY · 64</span>
+          </div>
+        </a>
+
+        <!-- Desktop Menu -->
+        <nav class="nav-links hide-mobile" aria-label="Navigation principale">
+          <a href="/" class:list={['nav-item', { 'active': isActive('/') }]}>Accueil</a>
+          <a href="/nosparties" class:list={['nav-item', { 'active': isActive('/nosparties') }]}>Agenda</a>
+          <a href="/nos-terrains" class:list={['nav-item', { 'active': isActive('/nos-terrains') }]}>Terrains</a>
+          <a href="/airsoft-dominical" class:list={['nav-item', { 'active': isActive('/airsoft-dominical') }]}>Dominical</a>
+          <a href="/milsim" class:list={['nav-item', { 'active': isActive('/milsim') }]}>Milsim</a>
+          <a href="/rejoindre" class:list={['nav-item', { 'active': isActive('/rejoindre') }]}>Rejoindre</a>
+
+          {user ? (
+            <div class="user-nav-group">
+              {user.role === 'admin' && (
+                <a href="/admin" class:list={['nav-item nav-item--admin', { 'active': isActive('/admin') }]}>
+                  <span class="dot-indicator"></span> Admin
+                </a>
+              )}
+              {(user.role === 'admin' || (user.tags && JSON.parse(user.tags).includes('milsim'))) && (
+                <a href="/forum" class:list={['nav-item nav-item--forum', { 'active': isActive('/forum') }]}>
+                  Forum
+                </a>
+              )}
+              <a href="/membres" class:list={['nav-item nav-item--user', { 'active': isActive('/membres') }]}>
+                {user.username}
+              </a>
+              <a href="/deconnexion" class="nav-item nav-item--logout" title="Déconnexion">
+                ✕
+              </a>
+            </div>
+          ) : (
+            <a href="/connexion" class="btn btn-primary btn-sm">
+              Connexion
+            </a>
+          )}
+        </nav>
+
+        <!-- Mobile Toggle Button -->
+        <button id="mobile-toggle" class="mobile-toggle hide-desktop" aria-label="Ouvrir le menu" aria-expanded="false">
+          <span class="toggle-bar"></span>
+          <span class="toggle-bar"></span>
+          <span class="toggle-bar"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Mobile Drawer Overlay -->
+    <div id="mobile-drawer" class="mobile-drawer hide-desktop" aria-hidden="true">
+      <nav class="mobile-nav">
+        <a href="/" class:list={['mobile-item', { 'active': isActive('/') }]}>Accueil</a>
+        <a href="/nosparties" class:list={['mobile-item', { 'active': isActive('/nosparties') }]}>Agenda des parties</a>
+        <a href="/nos-terrains" class:list={['mobile-item', { 'active': isActive('/nos-terrains') }]}>Nos Terrains</a>
+        <a href="/airsoft-dominical" class:list={['mobile-item', { 'active': isActive('/airsoft-dominical') }]}>Airsoft Dominical</a>
+        <a href="/milsim" class:list={['mobile-item', { 'active': isActive('/milsim') }]}>Le Milsim</a>
+
+        <div class="mobile-divider"></div>
+
+        {user ? (
+          <>
+            {user.role === 'admin' && <a href="/admin" class="mobile-item text-gold">Administration</a>}
+            {(user.role === 'admin' || (user.tags && JSON.parse(user.tags).includes('milsim'))) && (
+              <a href="/forum" class="mobile-item text-brand">Forum Milsim Privé</a>
+            )}
+            <a href="/membres" class="mobile-item">Mon Profil ({user.username})</a>
+            <a href="/deconnexion" class="mobile-item text-ember">Déconnexion</a>
+          </>
+        ) : (
+          <a href="/connexion" class="btn btn-primary w-full text-center mt-auto">Se connecter</a>
+        )}
+      </nav>
+    </div>
+
+    <!-- Main Content Slot -->
+    <main id="main-content" class="main-body">
+      <slot />
+    </main>
+
+    <!-- FOOTER AURORA GLASS -->
+    <footer class="footer">
+      <div class="container footer-grid">
+        <div class="footer-brand">
+          <div class="brand-logo mb-3">
+            <span class="logo-badge">ASAP</span>
+            <div class="logo-text">
+              <span class="logo-title">AIRSOFT</span>
+              <span class="logo-sub">NAY · BEARN · 64</span>
+            </div>
+          </div>
+          <p class="footer-about">
+            Association Sportive Airsoft Pyrénéenne (Loi 1901, RNA: W643013206).
+            Club fondé en 2023 à Nay (près de Pau), dédié à l'immersion tactique, au Milsim et aux parties dominicales conviviales.
+          </p>
+          <div class="status mt-4">
+            <span class="status-dot status-dot--on"></span>
+            <span>CLIMATE CONTROLLED · SESSIONS ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="footer-nav">
+          <span class="form-label mb-3 display-block">Navigation</span>
+          <ul class="footer-links">
+            <li><a href="/nosparties">Agenda des événements</a></li>
+            <li><a href="/nos-terrains">Terrain (Parc de Caubous)</a></li>
+            <li><a href="/airsoft-dominical">Format Dominical</a></li>
+            <li><a href="/milsim">Doctrine Milsim</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-community">
+          <span class="form-label mb-3 display-block">Communauté & Partenaires</span>
+          <ul class="footer-links">
+            <li><a href="https://discord.gg/uXB4TcP7Yy" target="_blank" rel="noopener noreferrer">Discord Officiel ↗</a></li>
+            <li><a href="https://www.facebook.com/profile.php?id=61552591082020" target="_blank" rel="noopener noreferrer">Facebook ASAP ↗</a></li>
+            <li><a href="https://www.instagram.com/asap64800/" target="_blank" rel="noopener noreferrer">Instagram ↗</a></li>
+            <li><a href="https://family-airsoft.fr/" target="_blank" rel="noopener noreferrer" class="text-gold">Partenaire: Family Airsoft ↗</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="container footer-bottom">
+        <p>&copy; {new Date().getFullYear()} ASAP Airsoft. Association Loi 1901. Tous droits réservés.</p>
+        <span class="badge badge-muted">BUILD v3.0 · AURORA GLASS</span>
+      </div>
+    </footer>
+
+    <!-- Interactive UI Scripts -->
+    <script>
+      // Mobile menu drawer handler
+      const toggleBtn = document.getElementById('mobile-toggle');
+      const drawer = document.getElementById('mobile-drawer');
+
+      if (toggleBtn && drawer) {
+        toggleBtn.addEventListener('click', () => {
+          const isOpen = drawer.classList.contains('open');
+          if (isOpen) {
+            drawer.classList.remove('open');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            document.body.style.overflow = '';
+          } else {
+            drawer.classList.add('open');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+            document.body.style.overflow = 'hidden';
+          }
+        });
+      }
+
+      // Scroll Reveal Observer
+      if ('IntersectionObserver' in window) {
+        const revealObserver = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              revealObserver.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.05, rootMargin: '0px 0px -30px 0px' });
+        document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+      } else {
+        document.querySelectorAll('.reveal').forEach((el) => el.classList.add('visible'));
+      }
+      // Force visible les éléments déjà dans le viewport
+      setTimeout(() => {
+        document.querySelectorAll('.reveal:not(.visible)').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.top < window.innerHeight) el.classList.add('visible');
+        });
+      }, 60);
+    </script>
+  </body>
+</html>
+
+<style>
+  /* Accessibility Skip Link */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--brand);
+    color: var(--bg-void);
+    padding: var(--sp-2) var(--sp-4);
+    font-family: var(--font-sub);
+    font-weight: bold;
+    z-index: 1000;
+    transition: top 0.2s ease;
+  }
+  .skip-link:focus {
+    top: 0;
+  }
+
+  /* Navbar Glass Styling */
+  .navbar {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--nav-h);
+    background: rgba(4, 6, 10, 0.80);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border-bottom: 1px solid var(--glass-border);
+    z-index: var(--z-nav);
+    transition: var(--t-base);
+  }
+
+  .nav-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  /* Logo */
+  .brand-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    text-decoration: none;
+  }
+
+  .logo-badge {
+    font-family: var(--font-title);
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: var(--brand);
+    background: var(--brand-dim);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--r-sm);
+    box-shadow: var(--glow-brand-sm);
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+
+  .logo-title {
+    font-family: var(--font-title);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 2px;
+  }
+
+  .logo-sub {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  /* Nav Links Desktop */
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .nav-item {
+    font-family: var(--font-sub);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0.5rem 1rem;
+    border-radius: var(--r-sm);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: var(--t-base);
+  }
+
+  .nav-item:hover {
+    color: var(--text-bright);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .nav-item.active {
+    color: var(--brand);
+    background: var(--brand-dim);
+    border: 1px solid rgba(0, 212, 170, 0.2);
+  }
+
+  .user-nav-group {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-left: var(--sp-3);
+    padding-left: var(--sp-3);
+    border-left: 1px solid var(--glass-border);
+  }
+
+  .nav-item--admin {
+    color: var(--gold);
+    border: 1px solid rgba(201, 168, 76, 0.3);
+  }
+  .nav-item--admin:hover {
+    background: var(--gold-dim);
+    color: var(--gold);
+  }
+
+  .nav-item--forum {
+    color: var(--blue-info);
+  }
+
+  .nav-item--user {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--text-bright);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .nav-item--logout {
+    color: var(--ember);
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* Mobile Toggle — Hamburger → Croix */
+  .mobile-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: var(--sp-2);
+    cursor: pointer;
+  }
+
+  .toggle-bar {
+    width: 22px;
+    height: 2px;
+    background: var(--brand);
+    border-radius: 2px;
+    transform-origin: center;
+    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+                opacity 0.18s ease,
+                background 0.18s ease;
+  }
+
+  /* État ouvert : transformation en croix */
+  .mobile-toggle[aria-expanded="true"] .toggle-bar:nth-child(1) {
+    transform: rotate(45deg) translate(4.5px, 4.5px);
+  }
+  .mobile-toggle[aria-expanded="true"] .toggle-bar:nth-child(2) {
+    opacity: 0;
+    transform: translateX(-6px) scaleX(0);
+  }
+  .mobile-toggle[aria-expanded="true"] .toggle-bar:nth-child(3) {
+    transform: rotate(-45deg) translate(4.5px, -4.5px);
+  }
+
+  /* Mobile Drawer */
+  .mobile-drawer {
+    position: fixed;
+    top: var(--nav-h);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(6, 9, 18, 0.95);
+    backdrop-filter: blur(25px);
+    z-index: 99;
+    padding: var(--sp-6);
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--t-spring);
+  }
+
+  .mobile-drawer.open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobile-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    height: 100%;
+  }
+
+  .mobile-item {
+    font-family: var(--font-title);
+    font-size: 1.2rem;
+    color: var(--text-main);
+    text-decoration: none;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+  }
+
+  .mobile-item.active {
+    color: var(--brand);
+    background: var(--brand-dim);
+    border-color: rgba(0, 212, 170, 0.3);
+  }
+
+  .mobile-divider {
+    height: 1px;
+    background: var(--glass-border);
+    margin-block: var(--sp-4);
+  }
+
+  /* Responsive Display Utility */
+  @media (max-width: 900px) {
+    .hide-mobile { display: none !important; }
+  }
+  @media (min-width: 901px) {
+    .hide-desktop { display: none !important; }
+  }
+
+  /* View Transitions */
+  ::view-transition-old(root) {
+    animation: vt-out 0.18s ease-out both;
+  }
+  ::view-transition-new(root) {
+    animation: vt-in 0.22s ease-in both;
+  }
+  @keyframes vt-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-6px); }
+  }
+  @keyframes vt-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) { animation: none; }
+  }
+
+  /* Main Body */
+  .main-body {
+    min-height: calc(100vh - var(--nav-h) - 300px);
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: var(--section-y);
+    background: rgba(4, 6, 10, 0.9);
+    border-top: 1px solid var(--glass-border);
+    padding-top: var(--sp-16);
+    padding-bottom: var(--sp-8);
+  }
+
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: var(--sp-12);
+    margin-bottom: var(--sp-12);
+  }
+
+  @media (max-width: 768px) {
+    .footer-grid {
+      grid-template-columns: 1fr;
+      gap: var(--sp-8);
+    }
+  }
+
+  .footer-about {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    max-width: 480px;
+  }
+
+  .display-block { display: block; }
+  .mb-3 { margin-bottom: var(--sp-3); }
+
+  .footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .footer-links a {
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    transition: var(--t-base);
+  }
+
+  .footer-links a:hover {
+    color: var(--brand);
+    padding-left: var(--sp-1);
+  }
+
+  .footer-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: var(--sp-6);
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+  }
+</style>

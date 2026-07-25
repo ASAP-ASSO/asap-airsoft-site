@@ -1,0 +1,211 @@
+---
+interface Props {
+  title?: string;
+  subtitle?: string;
+  image?: string;
+  badge?: string;
+  badgeVariant?: 'brand' | 'gold' | 'ember' | 'blue';
+  href?: string;
+  lift?: boolean;
+  class?: string;
+}
+
+const {
+  title,
+  subtitle,
+  image,
+  badge,
+  badgeVariant = 'brand',
+  href,
+  lift = true,
+  class: className = '',
+} = Astro.props;
+
+const Tag = href ? 'a' : 'div';
+---
+
+<Tag
+  class:list={['glass-card glass glass-shine', className, { 'glass--lift': lift, 'glass-card--link': !!href }]}
+  href={href}
+>
+  {image && (
+    <div class="card-img-wrap">
+      <img src={image} alt={title || ''} loading="lazy" decoding="async" />
+      <div class="card-img-fade" aria-hidden="true"></div>
+      {badge && (
+        <span class={`badge badge-${badgeVariant} card-badge`}>{badge}</span>
+      )}
+    </div>
+  )}
+
+  <div class="card-body">
+    {title && (
+      <h3 class="card-title">
+        <span class="card-title-accent" aria-hidden="true"></span>
+        {title}
+      </h3>
+    )}
+    {subtitle && <p class="card-subtitle">{subtitle}</p>}
+    <div class="card-slot">
+      <slot />
+    </div>
+  </div>
+
+  <!-- Coin déco supérieur droit -->
+  <span class="card-corner-tl" aria-hidden="true"></span>
+  <span class="card-corner-br" aria-hidden="true"></span>
+</Tag>
+
+<style>
+  .glass-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+    container-type: inline-size;
+  }
+
+  /* Container Queries pour la Bento Grid */
+  @container (max-width: 320px) {
+    .card-img-wrap {
+      height: 160px;
+    }
+    .card-body {
+      padding: var(--sp-3);
+    }
+    .card-title {
+      font-size: var(--fs-md);
+    }
+  }
+
+  .glass-card--link { cursor: pointer; }
+
+  /* Image */
+  .card-img-wrap {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .card-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s ease;
+    filter: brightness(0.85) saturate(1.1);
+  }
+
+  .glass-card:hover .card-img-wrap img {
+    transform: scale(1.07);
+    filter: brightness(1) saturate(1.2);
+  }
+
+  .card-img-fade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      transparent 40%,
+      rgba(11, 18, 32, 0.85) 100%
+    );
+    pointer-events: none;
+  }
+
+  .card-badge {
+    position: absolute;
+    top: var(--sp-4);
+    right: var(--sp-4);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Corps */
+  .card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: var(--card-pad);
+    gap: var(--sp-3);
+  }
+
+  /* Titre */
+  .card-title {
+    font-size: var(--fs-lg);
+    color: var(--text-bright);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    letter-spacing: 1px;
+  }
+
+  .card-title-accent {
+    display: block;
+    width: 3px;
+    height: 1.1em;
+    background: linear-gradient(180deg, var(--brand), var(--gold));
+    border-radius: 2px;
+    flex-shrink: 0;
+    box-shadow: var(--glow-brand-sm);
+    transition: var(--t-base);
+  }
+
+  .glass-card:hover .card-title-accent {
+    box-shadow: var(--glow-brand-md);
+  }
+
+  .card-subtitle {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.5px;
+  }
+
+  /* Slot */
+  .card-slot {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-slot :global(p) {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  /* Coins décoratifs */
+  .card-corner-tl,
+  .card-corner-br {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    opacity: 0;
+    transition: var(--t-base);
+  }
+
+  .card-corner-tl {
+    top: 6px;
+    left: 6px;
+    border-top: 1.5px solid var(--brand);
+    border-left: 1.5px solid var(--brand);
+  }
+
+  .card-corner-br {
+    bottom: 6px;
+    right: 6px;
+    border-bottom: 1.5px solid var(--gold);
+    border-right: 1.5px solid var(--gold);
+  }
+
+  .glass-card:hover .card-corner-tl,
+  .glass-card:hover .card-corner-br {
+    opacity: 1;
+    width: 14px;
+    height: 14px;
+  }
+</style>

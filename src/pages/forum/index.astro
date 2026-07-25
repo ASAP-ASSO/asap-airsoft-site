@@ -1,0 +1,767 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { db } from '../../db/index';
+import { ensureForumCategories, seedInitialForumTopics, generateQuickTopic, DEFAULT_TAGS } from '../../db/forum-generator';
+import { checkContentSafety, sanitizeText } from '../../lib/moderation-filter';
+import crypto from 'crypto';
+
+const currentUser = Astro.locals.user!; // Garanti par le middleware
+
+// 1. Initialisation catégories & seed automatique
+const categories = await ensureForumCategories();
+await seedInitialForumTopics(currentUser.id);
+
+// Récupérer les tags depuis DB
+const allTagsRes = await db.execute('SELECT * FROM forum_tags ORDER BY name ASC');
+const allTags = allTagsRes.rows as any[];
+
+let errorMsg = "";
+let successMsg = "";
+
+// URL filters
+const activeCategorySlug = Astro.url.searchParams.get("cat") || "all";
+const activeTagSlug = Astro.url.searchParams.get("tag") || "all";
+const searchQuery = (Astro.url.searchParams.get("q") || "").trim();
+
+// Traitement POST : Créer un nouveau sujet, générer un sujet auto ou actions admin
+if (Astro.request.method === "POST") {
+  try {
+    const data = await Astro.request.formData();
+    const action = data.get("action") as string;
+
+    if (action === "admin_delete_topic" && currentUser.role === 'admin') {
+      const topicId = data.get("topic_id") as string;
+      if (topicId) {
+        await db.execute({ sql: 'DELETE FROM forum_topics WHERE id = ?', args: [topicId] });
+        successMsg = "Sujet supprimé par la modération.";
+      }
+    } else if (action === "admin_toggle_pin" && currentUser.role === 'admin') {
+      const topicId = data.get("topic_id") as string;
+      if (topicId) {
+        await db.execute({ sql: 'UPDATE forum_topics SET is_pinned = NOT is_pinned WHERE id = ?', args: [topicId] });
+        successMsg = "Statut d'épinglage mis à jour.";
+      }
+    } else if (action === "quick_gen") {
+      const type = data.get("type") as 'briefing' | 'debriefing' | 'gear';
+      const createdId = await generateQuickTopic(type, currentUser.id);
+      return Astro.redirect(`/forum/topic/${createdId}`);
+    } else {
+      const title = (data.get("title") as string || "").trim();
+      const rawContent = (data.get("content") as string || "").trim();
+      const categoryId = (data.get("category_id") as string || "").trim() || categories[0]?.id;
+      const selectedTags = data.getAll("tags") as string[];
+
+      // Moteur de Modération Automatique
+      const titleSafety = checkContentSafety(title);
+      const contentSafety = checkContentSafety(rawContent);
+
+      if (!title || !rawContent) {
+        errorMsg = "Le titre et le message initial sont obligatoires.";
+      } else if (!titleSafety.safe) {
+        errorMsg = `Titre rejeté : ${titleSafety.reason}`;
+      } else if (!contentSafety.safe) {
+        errorMsg = `Message rejeté : ${contentSafety.reason}`;
+      } else {
+        const content = sanitizeText(rawContent);
+        const topicId = crypto.randomUUID();
+        const postId = crypto.randomUUID();
+
+        await db.execute({
+          sql: `INSERT INTO forum_topics (id, category_id, title, created_by) VALUES (?, ?, ?, ?)`,
+          args: [topicId, categoryId, title, currentUser.id]
+        });
+
+        await db.execute({
+          sql: `INSERT INTO forum_posts (id, topic_id, content, created_by) VALUES (?, ?, ?, ?)`,
+          args: [postId, topicId, content, currentUser.id]
+        });
+
+        if (selectedTags && selectedTags.length > 0) {
+          for (const tagId of selectedTags) {
+            await db.execute({
+              sql: `INSERT OR IGNORE INTO forum_topic_tags (topic_id, tag_id) VALUES (?, ?)`,
+              args: [topicId, tagId]
+            });
+          }
+        }
+
+        return Astro.redirect(`/forum/topic/${topicId}`);
+      }
+    }
+  } catch (e: any) {
+    console.error("Erreur création sujet:", e);
+    errorMsg = "Une erreur système est survenue.";
+  }
+}
+
+// Construction de la requête avec filtres
+let querySQL = `
+  SELECT 
+    t.id, 
+    t.title, 
+    t.created_at, 
+    t.is_pinned,
+    t.is_ai_generated,
+    t.views_count,
+    u.username,
+    c.name as category_name,
+    c.color as category_color,
+    c.icon as category_icon,
+    c.slug as category_slug,
+    (SELECT COUNT(*) - 1 FROM forum_posts p WHERE p.topic_id = t.id) as replies_count
+  FROM forum_topics t
+  JOIN users u ON t.created_by = u.id
+  LEFT JOIN forum_categories c ON t.category_id = c.id
+  WHERE 1=1
+`;
+
+const params: any[] = [];
+
+if (activeCategorySlug !== 'all') {
+  querySQL += ` AND c.slug = ?`;
+  params.push(activeCategorySlug);
+}
+
+if (activeTagSlug !== 'all') {
+  querySQL += ` AND t.id IN (
+    SELECT topic_id FROM forum_topic_tags tt 
+    JOIN forum_tags tg ON tt.tag_id = tg.id 
+    WHERE tg.slug = ?
+  )`;
+  params.push(activeTagSlug);
+}
+
+if (searchQuery) {
+  querySQL += ` AND (t.title LIKE ? OR u.username LIKE ?)`;
+  params.push(`%${searchQuery}%`, `%${searchQuery}%`);
+}
+
+querySQL += ` ORDER BY t.is_pinned DESC, t.created_at DESC`;
+
+const rawTopicsRes = await db.execute({ sql: querySQL, args: params });
+const rawTopics = rawTopicsRes.rows as any[];
+
+// Attacher les tags à chaque topic
+const topics = await Promise.all(rawTopics.map(async t => {
+  const topicTagsRes = await db.execute({
+    sql: `
+      SELECT tg.id, tg.name, tg.slug, tg.color 
+      FROM forum_tags tg
+      JOIN forum_topic_tags tt ON tg.id = tt.tag_id
+      WHERE tt.topic_id = ?
+    `,
+    args: [t.id]
+  });
+  return { ...t, tags: topicTagsRes.rows };
+}));
+
+// Stats globales
+const totalTopicsRes = await db.execute(`SELECT COUNT(*) as count FROM forum_topics`);
+const totalTopics = Number((totalTopicsRes.rows[0] as any)?.count || 0);
+
+const totalPostsRes = await db.execute(`SELECT COUNT(*) as count FROM forum_posts`);
+const totalPosts = Number((totalPostsRes.rows[0] as any)?.count || 0);
+
+// Pré-calculer les counts par catégorie
+const categoryCounts: Record<string, number> = {};
+for (const cat of categories) {
+  const catCountRes = await db.execute({ sql: `SELECT COUNT(*) as c FROM forum_topics WHERE category_id = ?`, args: [cat.id] });
+  categoryCounts[cat.id] = Number((catCountRes.rows[0] as any)?.c || 0);
+}
+---
+
+<Layout title="Forum Milsim & Transmissions">
+  <section class="container py-5">
+    <div class="forum-header my-3">
+      <div>
+        <h1 class="section-title forum-title">Forum Milsim & Transmissions</h1>
+        <p class="section-subtitle">Espace tactique de planification, débriefing et armurerie</p>
+      </div>
+
+      <!-- Quick AI Generation Bar for Admins / Tactical Leaders -->
+      <div class="quick-gen-box hud-panel">
+        <span class="gen-label">⚡ GÉNÉRATION 1-CLIC IA :</span>
+        <form method="POST" class="gen-form">
+          <input type="hidden" name="action" value="quick_gen" />
+          <button type="submit" name="type" value="briefing" class="hud-btn-mini btn-briefing">📢 Briefing OP</button>
+          <button type="submit" name="type" value="debriefing" class="hud-btn-mini btn-debriefing">💬 Debriefing</button>
+          <button type="submit" name="type" value="gear" class="hud-btn-mini btn-gear">⚙️ Fiche Matos</button>
+        </form>
+      </div>
+    </div>
+
+    {errorMsg && (
+      <div class="hud-panel error-box my-3">
+        <span>⚠️ {errorMsg}</span>
+      </div>
+    )}
+
+    {successMsg && (
+      <div class="hud-panel success-box my-3">
+        <span>✔ {successMsg}</span>
+      </div>
+    )}
+
+    <!-- Navigation Filtres & Recherche HUD -->
+    <div class="forum-controls hud-panel my-4">
+      <div class="controls-top">
+        <div class="category-tabs">
+          <a href={`/forum${activeTagSlug !== 'all' ? `?tag=${activeTagSlug}` : ''}`} class={`cat-tab ${activeCategorySlug === 'all' ? 'active' : ''}`}>
+            🌐 Tous ({totalTopics})
+          </a>
+          {categories.map(cat => {
+            const count = categoryCounts[cat.id] || 0;
+            return (
+              <a 
+                href={`/forum?cat=${cat.slug}${activeTagSlug !== 'all' ? `&tag=${activeTagSlug}` : ''}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}`} 
+                class={`cat-tab ${activeCategorySlug === cat.slug ? 'active' : ''}`}
+                style={activeCategorySlug === cat.slug ? `border-color: ${cat.color}; color: #fff;` : ''}
+              >
+                <span class="cat-icon">{cat.icon}</span> {cat.name} <span class="badge-count">({count})</span>
+              </a>
+            );
+          })}
+        </div>
+
+        <form method="GET" class="search-form">
+          {activeCategorySlug !== 'all' && <input type="hidden" name="cat" value={activeCategorySlug} />}
+          {activeTagSlug !== 'all' && <input type="hidden" name="tag" value={activeTagSlug} />}
+          <input 
+            type="text" 
+            name="q" 
+            class="hud-input search-input" 
+            placeholder="🔍 Rechercher sujet ou membre..." 
+            value={searchQuery}
+          />
+          {searchQuery && (
+            <a href={`/forum${activeCategorySlug !== 'all' ? `?cat=${activeCategorySlug}` : ''}${activeTagSlug !== 'all' ? `${activeCategorySlug !== 'all' ? '&' : '?'}tag=${activeTagSlug}` : ''}`} class="hud-btn-mini clear-search">✖ Clear</a>
+          )}
+        </form>
+      </div>
+
+      <!-- Tag Filters Bar -->
+      <div class="tags-filter-bar mt-3">
+        <span class="filter-label">🏷️ TAGS :</span>
+        <a 
+          href={`/forum?${activeCategorySlug !== 'all' ? `cat=${activeCategorySlug}` : ''}`} 
+          class={`tag-chip ${activeTagSlug === 'all' ? 'active-tag' : ''}`}
+        >
+          Tous les tags
+        </a>
+        {allTags.map(tag => (
+          <a 
+            href={`/forum?tag=${tag.slug}${activeCategorySlug !== 'all' ? `&cat=${activeCategorySlug}` : ''}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}`}
+            class={`tag-chip ${activeTagSlug === tag.slug ? 'active-tag' : ''}`}
+            style={`--tag-color: ${tag.color};`}
+          >
+            #{tag.name}
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <div class="forum-grid py-2">
+      <!-- Liste des discussions -->
+      <div class="hud-panel topics-card">
+        <div class="card-header-flex">
+          <h2>Discussions ({topics.length})</h2>
+          <span class="stat-badge">Transmissions enregistrées : {totalPosts}</span>
+        </div>
+
+        {topics.length === 0 ? (
+          <div class="no-topics text-center py-5">
+            <p class="text-muted">Aucune transmission trouvée pour ces filtres.</p>
+            <form method="POST" class="mt-3">
+              <input type="hidden" name="action" value="quick_gen" />
+              <button type="submit" name="type" value="briefing" class="hud-btn hud-btn-filled">⚡ Générer un Briefing IA</button>
+            </form>
+          </div>
+        ) : (
+          <div class="topics-list">
+            {topics.map(t => (
+              <div class={`topic-row hud-panel ${t.is_pinned ? 'pinned-topic' : ''}`}>
+                <div class="topic-main">
+                  <div class="topic-title-bar">
+                    {t.is_pinned === 1 && <span class="badge-hud badge-pinned">📌 ÉPINGLÉ</span>}
+                    {t.is_ai_generated === 1 && <span class="badge-hud badge-ai">⚡ AUTO-IA</span>}
+                    {t.category_name && (
+                      <span class="badge-hud badge-cat" style={`border-color: ${t.category_color}; color: ${t.category_color};`}>
+                        {t.category_icon} {t.category_name}
+                      </span>
+                    )}
+                    <a href={`/forum/topic/${t.id}`} class="topic-link-title">{t.title}</a>
+                  </div>
+
+                  {t.tags && t.tags.length > 0 && (
+                    <div class="topic-tags-inline">
+                      {t.tags.map((tg: any) => (
+                        <span class="tag-badge-small" style={`color: ${tg.color}; border-color: ${tg.color};`}>
+                          #{tg.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div class="topic-meta">
+                    Par <span class="author">{t.username}</span> • {new Date(t.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+
+                <div class="topic-stats-group">
+                  <div class="topic-stats">
+                    <span class="stat-number">{t.views_count || 0}</span>
+                    <span class="stat-label">Vues</span>
+                  </div>
+                  <div class="topic-stats">
+                    <span class="stat-number">{t.replies_count}</span>
+                    <span class="stat-label">Réponses</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <!-- Créer un sujet -->
+      <div class="hud-panel create-card">
+        <h2>Nouveau Briefing / Sujet</h2>
+        <form method="POST" class="create-form">
+          <div class="hud-form-group">
+            <label class="hud-form-label" for="category_id">Pilier / Catégorie</label>
+            <select class="hud-input hud-select" id="category_id" name="category_id" required>
+              {categories.map(c => (
+                <option value={c.id}>{c.icon} {c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div class="hud-form-group">
+            <label class="hud-form-label">Tags Tactiques</label>
+            <div class="tag-selector-grid">
+              {allTags.map(tg => (
+                <label class="tag-checkbox-label">
+                  <input type="checkbox" name="tags" value={tg.id} />
+                  <span class="tag-checkbox-badge" style={`--tag-color: ${tg.color};`}>#{tg.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div class="hud-form-group">
+            <label class="hud-form-label" for="title">Titre du message</label>
+            <input class="hud-input" type="text" id="title" name="title" placeholder="Ex: [REX] Partie du 24/07 - Squad Bravo" required />
+          </div>
+
+          <div class="hud-form-group">
+            <label class="hud-form-label" for="content">Contenu de la transmission</label>
+            <textarea class="hud-input hud-textarea" id="content" name="content" rows="6" placeholder="Détails tactiques, compte-rendu, questions..." required></textarea>
+          </div>
+
+          <button type="submit" class="hud-btn hud-btn-filled w-100 my-3">Diffuser la transmission</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .forum-title {
+    color: #3ba0e3;
+    text-shadow: 0 0 10px rgba(59, 160, 227, 0.2);
+    margin-bottom: 0.25rem;
+  }
+
+  .section-subtitle {
+    font-family: var(--font-sub);
+    font-size: 1.1rem;
+    color: var(--color-primary);
+    letter-spacing: 1px;
+  }
+
+  .forum-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .quick-gen-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    background-color: rgba(59, 160, 227, 0.05);
+    border: 1px solid rgba(59, 160, 227, 0.3);
+  }
+
+  .gen-label {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #3ba0e3;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .gen-form {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .hud-btn-mini {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.35rem 0.75rem;
+    background: transparent;
+    border: 1px solid rgba(193, 185, 127, 0.3);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    border-radius: 2px;
+  }
+
+  .btn-briefing:hover { border-color: #3ba0e3; color: #3ba0e3; background: rgba(59, 160, 227, 0.1); }
+  .btn-debriefing:hover { border-color: #ea580c; color: #ea580c; background: rgba(234, 88, 12, 0.1); }
+  .btn-gear:hover { border-color: #c1b97f; color: #c1b97f; background: rgba(193, 185, 127, 0.1); }
+
+  .forum-controls {
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem 1.5rem;
+    gap: 1rem;
+    background-color: var(--color-bg-card);
+  }
+
+  .controls-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .category-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .cat-tab {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 0.4rem 0.85rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    border: 1px solid rgba(193, 185, 127, 0.2);
+    transition: all 0.2s ease;
+    border-radius: 2px;
+  }
+
+  .cat-tab:hover, .cat-tab.active {
+    color: #fff;
+    background-color: rgba(59, 160, 227, 0.15);
+    border-color: #3ba0e3;
+  }
+
+  .badge-count {
+    opacity: 0.7;
+    font-size: 0.75rem;
+  }
+
+  .tags-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(193, 185, 127, 0.1);
+    padding-top: 0.75rem;
+  }
+
+  .filter-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-right: 0.25rem;
+  }
+
+  .tag-chip {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    color: var(--tag-color, var(--color-text-muted));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .tag-chip:hover, .tag-chip.active-tag {
+    background-color: rgba(59, 160, 227, 0.15);
+    border-color: var(--tag-color, #3ba0e3);
+    color: #fff;
+  }
+
+  .search-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 260px;
+  }
+
+  .search-input {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .error-box {
+    background-color: rgba(230, 95, 43, 0.1);
+    border-color: var(--color-accent);
+    color: #fff;
+    padding: 1rem;
+  }
+
+  .success-box {
+    background-color: rgba(0, 255, 102, 0.05);
+    border-color: #00ff66;
+    color: #fff;
+    padding: 1rem;
+  }
+
+  .forum-grid {
+    display: grid;
+    grid-template-columns: 2.2fr 1fr;
+    gap: 2.5rem;
+  }
+
+  .topics-card, .create-card {
+    padding: 2rem;
+    background-color: var(--color-bg-card);
+  }
+
+  .card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(193, 185, 127, 0.2);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-header-flex h2, .create-card h2 {
+    font-size: 1.3rem;
+    margin: 0;
+  }
+
+  .stat-badge {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .topics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .topic-row {
+    padding: 1.25rem 1.5rem;
+    background-color: var(--color-bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(193, 185, 127, 0.1);
+    transition: all 0.2s ease;
+  }
+
+  .pinned-topic {
+    border-left: 3px solid #ffb703;
+    background-color: rgba(255, 183, 3, 0.03);
+  }
+
+  .topic-row:hover {
+    border-color: #3ba0e3;
+    box-shadow: 0 0 10px rgba(59, 160, 227, 0.15);
+  }
+
+  .topic-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex-grow: 1;
+  }
+
+  .topic-title-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .topic-tags-inline {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .tag-badge-small {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .badge-hud {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .badge-pinned {
+    border-color: #ffb703;
+    color: #ffb703;
+    background-color: rgba(255, 183, 3, 0.1);
+  }
+
+  .badge-ai {
+    border-color: #06b6d4;
+    color: #06b6d4;
+    background-color: rgba(6, 182, 212, 0.1);
+  }
+
+  .topic-link-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    transition: all 0.3s ease;
+  }
+
+  .topic-link-title:hover {
+    color: #3ba0e3;
+    text-shadow: 0 0 5px rgba(59, 160, 227, 0.3);
+  }
+
+  .topic-meta {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+  }
+
+  .topic-meta .author {
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+  }
+
+  .topic-stats-group {
+    display: flex;
+    gap: 1rem;
+    border-left: 1px solid rgba(193, 185, 127, 0.1);
+    padding-left: 1rem;
+  }
+
+  .topic-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 55px;
+  }
+
+  .topic-stats .stat-number {
+    font-family: var(--font-title);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #3ba0e3;
+  }
+
+  .topic-stats .stat-label {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+  }
+
+  .hud-select {
+    width: 100%;
+    background-color: var(--color-bg);
+    color: #fff;
+    padding: 0.6rem;
+    border: 1px solid rgba(193, 185, 127, 0.3);
+  }
+
+  .tag-selector-grid {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0;
+  }
+
+  .tag-checkbox-label {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .tag-checkbox-label input {
+    display: none;
+  }
+
+  .tag-checkbox-badge {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 12px;
+    color: var(--tag-color, #fff);
+    transition: all 0.2s ease;
+  }
+
+  .tag-checkbox-label input:checked + .tag-checkbox-badge {
+    background-color: rgba(59, 160, 227, 0.2);
+    border-color: #3ba0e3;
+    font-weight: bold;
+    box-shadow: 0 0 6px rgba(59, 160, 227, 0.3);
+  }
+
+  .create-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hud-textarea {
+    resize: vertical;
+    font-family: var(--font-body);
+  }
+
+  .w-100 {
+    width: 100%;
+  }
+
+  @media (max-width: 900px) {
+    .forum-grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .topic-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .topic-stats-group {
+      border-left: none;
+      border-top: 1px solid rgba(193, 185, 127, 0.1);
+      padding-left: 0;
+      padding-top: 0.5rem;
+      width: 100%;
+      justify-content: space-around;
+    }
+  }
+</style>
