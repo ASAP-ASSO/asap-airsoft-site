@@ -1,5 +1,7 @@
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
+const CATEGORY_ID = process.env.DISCORD_CATEGORY_ID;
+const ROLE_ID = process.env.DISCORD_ROLE_ID;
 
 export async function sendDiscordEventSignup(data: {
   name: string;
@@ -49,17 +51,42 @@ export async function sendDiscordEventSignup(data: {
 
         // Si le salon n'existe pas, le créer automatiquement
         if (!channel) {
+          const bodyPayload: any = {
+            name: channelName,
+            type: 0,
+            topic: `Inscriptions et suivi pour la session ${data.event_date}`
+          };
+
+          // Catégorie cible (optionnel)
+          if (CATEGORY_ID) {
+            bodyPayload.parent_id = CATEGORY_ID;
+          }
+
+          // Restriction de visibilité à un seul Rôle (optionnel)
+          if (ROLE_ID) {
+            bodyPayload.permission_overwrites = [
+              {
+                id: GUILD_ID, // @everyone role ID
+                type: 0,
+                allow: '0',
+                deny: '1024' // Mask VIEW_CHANNEL for @everyone
+              },
+              {
+                id: ROLE_ID, // Allowed Role ID
+                type: 0,
+                allow: '1024', // Allow VIEW_CHANNEL for this role
+                deny: '0'
+              }
+            ];
+          }
+
           const createRes = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/channels`, {
             method: 'POST',
             headers: {
               Authorization: `Bot ${BOT_TOKEN}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              name: channelName,
-              type: 0,
-              topic: `Inscriptions et suivi pour la session ${data.event_date}`
-            })
+            body: JSON.stringify(bodyPayload)
           });
           if (createRes.ok) {
             channel = await createRes.json();
