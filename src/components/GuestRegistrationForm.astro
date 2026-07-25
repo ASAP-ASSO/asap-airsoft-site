@@ -77,6 +77,14 @@ const availableDates = calendarDateLabels.length > 0 ? calendarDateLabels : dbDa
       <textarea id="guest-notes" rows="2" class="form-control" placeholder="Première fois ? Besoins spécifiques ?"></textarea>
     </div>
 
+    <!-- Checkbox Consentement RGPD -->
+    <div class="form-group mt-4 flex items-start gap-2">
+      <input type="checkbox" id="guest-rgpd" required class="mt-1" style="accent-color: var(--brand);" />
+      <label for="guest-rgpd" class="text-muted" style="font-size:var(--fs-xs); line-height: 1.4;">
+        J'accepte que mes données (nom, email, téléphone) soient conservées par l'association ASAP pour la gestion de cette réservation, conformément à la <a href="/politique-de-confidentialite" target="_blank" rel="noopener noreferrer" style="color: var(--brand); text-decoration: underline;">Politique de Confidentialité</a>. *
+      </label>
+    </div>
+
     <div class="form-footer mt-6">
       <button type="submit" class="btn btn-gold btn-lg w-full text-center" id="submit-btn">
         Confirmer ma demande de réservation →

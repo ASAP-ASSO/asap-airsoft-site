@@ -6,8 +6,9 @@ import vercel from '@astrojs/vercel';
 export default defineConfig({
   output: 'server',
   security: {
-    checkOrigin: false,
+    checkOrigin: true,
   },
   site: 'https://asap-airsoft.fr',
   adapter: vercel(),
 });
+

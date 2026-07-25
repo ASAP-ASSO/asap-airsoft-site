@@ -2,6 +2,7 @@ const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const CATEGORY_ID = process.env.DISCORD_CATEGORY_ID;
 const ROLE_ID = process.env.DISCORD_ROLE_ID;
+const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 
 export async function sendDiscordEventSignup(data: {
   name: string;
@@ -29,11 +30,26 @@ export async function sendDiscordEventSignup(data: {
       { name: 'Total inscrits session', value: `${data.totalCount} participant(s)`, inline: false },
       { name: 'Remarques', value: data.notes || 'Aucune', inline: false }
     ],
-    footer: { text: 'ASAP Airsoft — Bot Inscriptions' },
+    footer: { text: 'ASAP Airsoft — Notifications Inscriptions' },
     timestamp: new Date().toISOString()
   };
 
-  // 1. Mode Bot Discord API (Création dynamique de salons)
+  // 1. Mode Webhook HTTP Prioritaire (Recommandé sur Vercel serverless)
+  if (WEBHOOK_URL) {
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ embeds: [embed] })
+      });
+      if (res.ok) return;
+      console.warn('Notification Webhook Discord retour non-200:', res.status);
+    } catch (err) {
+      console.error('Erreur Webhook Discord:', err);
+    }
+  }
+
+  // 2. Mode Bot Discord REST API (Si configuré et pas de webhook)
   if (BOT_TOKEN && GUILD_ID) {
     try {
       const prefix = isMilsim ? 'milsim' : 'domi';
@@ -49,7 +65,6 @@ export async function sendDiscordEventSignup(data: {
         const channels: any[] = await channelsRes.json();
         let channel = channels.find((c: any) => c.name === channelName && c.type === 0);
 
-        // Si le salon n'existe pas, le créer automatiquement
         if (!channel) {
           const bodyPayload: any = {
             name: channelName,
@@ -57,26 +72,11 @@ export async function sendDiscordEventSignup(data: {
             topic: `Inscriptions et suivi pour la session ${data.event_date}`
           };
 
-          // Catégorie cible (optionnel)
-          if (CATEGORY_ID) {
-            bodyPayload.parent_id = CATEGORY_ID;
-          }
-
-          // Restriction de visibilité à un seul Rôle (optionnel)
+          if (CATEGORY_ID) bodyPayload.parent_id = CATEGORY_ID;
           if (ROLE_ID) {
             bodyPayload.permission_overwrites = [
-              {
-                id: GUILD_ID, // @everyone role ID
-                type: 0,
-                allow: '0',
-                deny: '1024' // Mask VIEW_CHANNEL for @everyone
-              },
-              {
-                id: ROLE_ID, // Allowed Role ID
-                type: 0,
-                allow: '1024', // Allow VIEW_CHANNEL for this role
-                deny: '0'
-              }
+              { id: GUILD_ID, type: 0, allow: '0', deny: '1024' },
+              { id: ROLE_ID, type: 0, allow: '1024', deny: '0' }
             ];
           }
 
@@ -88,12 +88,10 @@ export async function sendDiscordEventSignup(data: {
             },
             body: JSON.stringify(bodyPayload)
           });
-          if (createRes.ok) {
-            channel = await createRes.json();
-          }
+          if (createRes.ok) channel = await createRes.json();
         }
 
-        if (channel && channel.id) {
+        if (channel?.id) {
           await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
             method: 'POST',
             headers: {
@@ -110,17 +108,8 @@ export async function sendDiscordEventSignup(data: {
     }
   }
 
-  // 2. Mode Webhook Fallback (Si le bot n'est pas encore configuré)
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  if (webhookUrl) {
-    try {
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed] })
-      });
-    } catch (err) {
-      console.error('Erreur Webhook Discord:', err);
-    }
+  if (!WEBHOOK_URL && !BOT_TOKEN) {
+    console.info('Discord notification ignorée: DISCORD_WEBHOOK_URL ou DISCORD_BOT_TOKEN non définis.');
   }
 }
+
