@@ -2,8 +2,19 @@
 // LiveRegistrationsWidget.astro - Bandeau de défilé des inscrits avec Insignes de Rangs CoD Style
 import { db } from '../db';
 import { getRankForXp, getXpRewardForPack } from '../utils/xpRank';
+import { getUpcomingCalendarEvents } from '../lib/calendar';
 
-const defaultDate = 'Prochain Dimanche (Briefing 08h45)';
+const calendarEvents = await getUpcomingCalendarEvents();
+const calendarDateLabels = calendarEvents.map(e => e.fullDateLabel);
+
+let dbDates: string[] = [];
+try {
+  const datesRes = await db.execute(`SELECT DISTINCT event_date FROM guest_registrations ORDER BY created_at DESC`);
+  dbDates = (datesRes.rows as unknown as Array<{ event_date: string }>).map(r => r.event_date);
+} catch (e) {}
+
+const availableDates = calendarDateLabels.length > 0 ? calendarDateLabels : dbDates;
+const defaultDate = availableDates[0] || '';
 
 let initialCount = 0;
 let initialPseudos: Array<{
@@ -16,39 +27,41 @@ let initialPseudos: Array<{
   rank_icon_svg: string;
 }> = [];
 
-try {
-  const countRes = await db.execute({ sql: `SELECT COUNT(*) as total FROM guest_registrations WHERE event_date = ?`, args: [defaultDate] });
-  initialCount = Number((countRes.rows[0] as any)?.total || 0);
+if (defaultDate) {
+  try {
+    const countRes = await db.execute({ sql: `SELECT COUNT(*) as total FROM guest_registrations WHERE event_date = ?`, args: [defaultDate] });
+    initialCount = Number((countRes.rows[0] as any)?.total || 0);
 
-  const rowsRes = await db.execute({
-    sql: `
-      SELECT g.id, g.pseudo, g.name, g.phone, g.event_date, g.pack_option, g.created_at, p.xp
-      FROM guest_registrations g
-      LEFT JOIN player_xp p ON REPLACE(g.phone, ' ', '') = p.phone OR g.pseudo = p.pseudo
-      WHERE g.event_date = ?
-      ORDER BY g.created_at DESC
-      LIMIT 30
-    `,
-    args: [defaultDate]
-  });
-  const rows = rowsRes.rows as unknown as Array<{ pseudo: string; name: string; pack_option: string; xp?: number }>;
+    const rowsRes = await db.execute({
+      sql: `
+        SELECT g.id, g.pseudo, g.name, g.phone, g.event_date, g.pack_option, g.created_at, p.xp
+        FROM guest_registrations g
+        LEFT JOIN player_xp p ON REPLACE(g.phone, ' ', '') = p.phone OR g.pseudo = p.pseudo
+        WHERE g.event_date = ?
+        ORDER BY g.created_at DESC
+        LIMIT 30
+      `,
+      args: [defaultDate]
+    });
+    const rows = rowsRes.rows as unknown as Array<{ pseudo: string; name: string; pack_option: string; xp?: number }>;
 
-  initialPseudos = rows.map(r => {
-    const name = r.pseudo || r.name.split(' ')[0];
-    const xp = typeof r.xp === 'number' ? r.xp : getXpRewardForPack(r.pack_option);
-    const rank = getRankForXp(xp);
-    return {
-      display_name: name,
-      pack_option: r.pack_option,
-      xp,
-      rank_name: rank.name,
-      rank_color: rank.color,
-      rank_glow: rank.glow,
-      rank_icon_svg: rank.iconSvg
-    };
-  });
-} catch (e) {
-  // Fallback if DB not reachable
+    initialPseudos = rows.map(r => {
+      const name = r.pseudo || r.name.split(' ')[0];
+      const xp = typeof r.xp === 'number' ? r.xp : getXpRewardForPack(r.pack_option);
+      const rank = getRankForXp(xp);
+      return {
+        display_name: name,
+        pack_option: r.pack_option,
+        xp,
+        rank_name: rank.name,
+        rank_color: rank.color,
+        rank_glow: rank.glow,
+        rank_icon_svg: rank.iconSvg
+      };
+    });
+  } catch (e) {
+    // Fallback if DB not reachable
+  }
 }
 
 // SSR display list (dupliqué pour défilé immédiat sans flash)
@@ -72,9 +85,13 @@ const ssrPseudos = initialPseudos.length > 0
     <!-- Sélecteur de date & Compteur -->
     <div class="header-right">
       <select id="event-date-select" class="form-control font-mono date-select" aria-label="Sélectionner la date">
-        <option value="Prochain Dimanche (Briefing 08h45)" selected>Prochain Dimanche (Briefing 08h45)</option>
-        <option value="Dimanche dans 2 semaines">Dimanche dans 2 semaines</option>
-        <option value="Opération Spéciale Milsim [TAG Milsim]">Opération Spéciale Milsim [TAG Milsim]</option>
+        {availableDates.length > 0 ? (
+          availableDates.map((dateStr, idx) => (
+            <option value={dateStr} selected={idx === 0}>{dateStr}</option>
+          ))
+        ) : (
+          <option value="" disabled selected>Aucune date disponible</option>
+        )}
       </select>
 
       <div class="counter-badge glass">

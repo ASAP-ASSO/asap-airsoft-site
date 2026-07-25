@@ -1,10 +1,25 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../db';
 import { getRankForXp, getXpRewardForPack } from '../../utils/xpRank';
+import { getUpcomingCalendarEvents } from '../../lib/calendar';
 
 export const GET: APIRoute = async ({ url }) => {
   try {
-    const event_date = url.searchParams.get('event_date') || 'Prochain Dimanche (Briefing 08h45)';
+    const calendarEvents = await getUpcomingCalendarEvents();
+    const calendarDateLabels = calendarEvents.map(e => e.fullDateLabel);
+
+    // Get all available event dates from DB
+    const datesRes = await db.execute(`
+      SELECT DISTINCT event_date FROM guest_registrations ORDER BY created_at DESC
+    `);
+    const dbDates = (datesRes.rows as unknown as Array<{ event_date: string }>).map(r => r.event_date);
+
+    const datesList = Array.from(new Set([...calendarDateLabels, ...dbDates]));
+
+    let event_date = url.searchParams.get('event_date');
+    if (!event_date || event_date === 'null') {
+      event_date = datesList[0] || '';
+    }
 
     // Get count for selected event date
     const countRes = await db.execute({
@@ -36,20 +51,6 @@ export const GET: APIRoute = async ({ url }) => {
       xp?: number;
       games_count?: number;
     }>;
-
-    // Get all available event dates
-    const datesRes = await db.execute(`
-      SELECT DISTINCT event_date FROM guest_registrations ORDER BY created_at DESC
-    `);
-    const datesRows = datesRes.rows as unknown as Array<{ event_date: string }>;
-
-    const datesList = datesRows.map(r => r.event_date);
-    if (!datesList.includes('Prochain Dimanche (Briefing 08h45)')) {
-      datesList.unshift('Prochain Dimanche (Briefing 08h45)');
-    }
-    if (!datesList.includes('Dimanche dans 2 semaines')) {
-      datesList.push('Dimanche dans 2 semaines');
-    }
 
     const inscritsFormatted = rows.map(r => {
       const displayName = r.pseudo || r.name.split(' ')[0];

@@ -1,11 +1,26 @@
 ---
 // GuestRegistrationForm.astro - Formulaire d'inscription rapide avec Modale XP & Rangs CoD Style
+import { getUpcomingCalendarEvents } from '../lib/calendar';
+import { db } from '../db';
+
+const calendarEvents = await getUpcomingCalendarEvents();
+const calendarDateLabels = calendarEvents.map(e => e.fullDateLabel);
+
+let dbDates: string[] = [];
+if (calendarDateLabels.length === 0) {
+  try {
+    const datesRes = await db.execute(`SELECT DISTINCT event_date FROM guest_registrations ORDER BY created_at DESC`);
+    dbDates = (datesRes.rows as unknown as Array<{ event_date: string }>).map(r => r.event_date);
+  } catch (e) {}
+}
+
+const availableDates = calendarDateLabels.length > 0 ? calendarDateLabels : dbDates;
 ---
 
 <div class="guest-signup-box glass glass-shine" id="form-invite">
   <div class="signup-header text-center">
     <span class="badge badge-gold">RÉSERVATION EXPRESS</span>
-    <h3 class="text-bright mt-1">Inscription Rapide Partie Dominicale</h3>
+    <h3 class="text-bright mt-1">Inscription Rapide Partie Dominicale & Evénement</h3>
     <p class="text-muted" style="font-size:var(--fs-sm)">
       Pas encore membre ? Réservez votre place au Parc de Caubous en 1 minute et gagnez de l'XP.
     </p>
@@ -38,9 +53,13 @@
       <div class="form-group">
         <label for="guest-date" class="form-label">Date de la Session au Parc de Caubous *</label>
         <select id="guest-date" required class="form-control font-mono">
-          <option value="Prochain Dimanche (Briefing 08h45)">Prochain Dimanche (Briefing 08h45)</option>
-          <option value="Dimanche dans 2 semaines">Dimanche dans 2 semaines</option>
-          <option value="Opération Spéciale Milsim [TAG Milsim]">Opération Spéciale Milsim [TAG Milsim]</option>
+          {availableDates.length > 0 ? (
+            availableDates.map((dateStr, idx) => (
+              <option value={dateStr} selected={idx === 0}>{dateStr}</option>
+            ))
+          ) : (
+            <option value="" disabled selected>Aucune session disponible</option>
+          )}
         </select>
       </div>
 
@@ -144,7 +163,7 @@
     if (isMilsim) {
       packSelect.innerHTML = `
         <option value="Opérateur (Opération Milsim +250 XP - 35€)">Opérateur (+250 XP - 35€)</option>
-        <option value="Plastron (Opération Milsim +250 XP - 35€)">Plastron (+250 XP - 35€)</option>
+        <option value="Plastron (Opération Milsim +250 XP - Gratuit)">Plastron (+250 XP - Gratuit)</option>
       `;
     } else {
       packSelect.innerHTML = `
