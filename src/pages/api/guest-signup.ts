@@ -80,37 +80,20 @@ export const POST: APIRoute = async ({ request }) => {
     });
     const totalCount = Number((countRes.rows[0] as any)?.total || 0);
 
-    // Send Discord Webhook Notification if Webhook URL is configured
-    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
-    if (discordWebhookUrl) {
-      try {
-        const embed = {
-          title: '🎯 Nouvelle Inscription Invité !',
-          color: 0x00d4aa,
-          fields: [
-            { name: 'Nom / Prénom', value: name, inline: true },
-            { name: 'Pseudo', value: pseudo || 'Non spécifié', inline: true },
-            { name: 'Rang & XP', value: `${rank.name} (${newXp} XP)`, inline: true },
-            { name: 'Date Session', value: event_date, inline: true },
-            { name: 'Option', value: pack_option, inline: true },
-            { name: 'Email', value: email, inline: true },
-            { name: 'Téléphone', value: phone, inline: true },
-            { name: 'Total inscrits pour cette date', value: `${totalCount} participant(s)`, inline: false },
-            { name: 'Remarques', value: notes || 'Aucune', inline: false }
-          ],
-          footer: { text: 'ASAP Airsoft — Système de Réservation' },
-          timestamp: new Date().toISOString()
-        };
-
-        await fetch(discordWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ embeds: [embed] })
-        });
-      } catch (err) {
-        console.error('Erreur d\'envoi Webhook Discord:', err);
-      }
-    }
+    // Notification Discord (Bot avec création dynamique de salon ou Webhook Fallback)
+    const { sendDiscordEventSignup } = await import('../../lib/discord-bot');
+    await sendDiscordEventSignup({
+      name,
+      pseudo,
+      email,
+      phone,
+      event_date,
+      pack_option,
+      notes,
+      rank_name: rank.name,
+      newXp,
+      totalCount
+    });
 
     return new Response(
       JSON.stringify({
