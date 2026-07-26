@@ -114,7 +114,7 @@ export const POST: APIRoute = async ({ request }) => {
   } catch (err: any) {
     console.error('Erreur API Guest Signup:', err);
     return new Response(
-      JSON.stringify({ error: err.message || 'Erreur serveur.' }),
+      JSON.stringify({ error: import.meta.env.PROD ? 'Une erreur interne est survenue sur le serveur.' : (err.message || 'Erreur serveur.') }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

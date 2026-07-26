@@ -136,6 +136,19 @@ const ssrPseudos = initialPseudos.length > 0
     pack_option: string;
   }> = [];
 
+  function escapeHtml(str: string): string {
+    return (str || '').replace(/[&<>"']/g, (m) => {
+      switch (m) {
+        case '&': return '&amp;';
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '"': return '&quot;';
+        case "'": return '&#39;';
+        default: return m;
+      }
+    });
+  }
+
   function checkAndSetScroll() {
     const container = document.getElementById('single-line-container');
     const track = document.getElementById('single-line-track');
@@ -149,11 +162,13 @@ const ssrPseudos = initialPseudos.length > 0
 
     let html = '';
     rawPseudos.forEach((item) => {
+      const safeName = escapeHtml(item.display_name);
+      const safeRank = escapeHtml(item.rank_name);
       html += `
-        <div class="player-pill" style="--rank-color: ${item.rank_color}; --rank-glow: ${item.rank_glow};" title="${item.display_name} — Rang ${item.rank_name} (${item.xp} XP)">
+        <div class="player-pill" style="--rank-color: ${item.rank_color}; --rank-glow: ${item.rank_glow};" title="${safeName} — Rang ${safeRank} (${item.xp} XP)">
           <span class="pill-rank-icon">${item.rank_icon_svg}</span>
-          <strong class="pill-name">${item.display_name}</strong>
-          <span class="pill-rank-tag">${item.rank_name}</span>
+          <strong class="pill-name">${safeName}</strong>
+          <span class="pill-rank-tag">${safeRank}</span>
         </div>
       `;
     });

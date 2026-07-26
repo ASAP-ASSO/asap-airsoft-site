@@ -16,6 +16,33 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Redirection de sécurité basique
   const url = new URL(context.request.url);
 
+  // Protection anti-CSRF sur les requêtes de modification (POST, PUT, DELETE, PATCH)
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(context.request.method)) {
+    const origin = context.request.headers.get('origin');
+    const referer = context.request.headers.get('referer');
+    const host = context.request.headers.get('host');
+
+    if (origin) {
+      try {
+        const originHost = new URL(origin).host;
+        if (host && originHost !== host) {
+          return new Response('Anti-CSRF: Validation d\'origine échouée.', { status: 403 });
+        }
+      } catch (e) {
+        return new Response('En-tête Origin invalide.', { status: 403 });
+      }
+    } else if (referer) {
+      try {
+        const refererHost = new URL(referer).host;
+        if (host && refererHost !== host) {
+          return new Response('Anti-CSRF: Validation du référent échouée.', { status: 403 });
+        }
+      } catch (e) {
+        return new Response('En-tête Referer invalide.', { status: 403 });
+      }
+    }
+  }
+
   // Sécurité Espace Admin
   if (url.pathname.startsWith('/admin')) {
     if (!context.locals.user || context.locals.user.role !== 'admin') {

@@ -49,57 +49,59 @@ try {
 
 try {
   const calendarId = '221cd9f549c1f1a88c6f99b34d65feba6a225a0d8a520b58c5f71d169effeaa5@group.calendar.google.com';
-  const apiKey = import.meta.env.GOOGLE_CALENDAR_API_KEY || 'AIzaSyDESZ8vJgN7QVPGvqcbZX0OnpO1gDjHWFw';
-  const timeMin = new Date().toISOString();
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&singleEvents=true&orderBy=startTime&maxResults=9`;
+  const apiKey = import.meta.env.GOOGLE_CALENDAR_API_KEY;
+  if (apiKey) {
+    const timeMin = new Date().toISOString();
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&singleEvents=true&orderBy=startTime&maxResults=9`;
 
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Erreur API Google: ${response.status}`);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Erreur API Google: ${response.status}`);
 
-  const data = await response.json();
+    const data = await response.json();
 
-  if (data.items) {
-    events = data.items.map((item: any) => {
-      let category = 'Général';
-      let title = item.summary || 'Événement sans titre';
-      if (title.includes(':')) {
-        const parts = title.split(':');
-        category = parts[0].trim();
-        title = parts.slice(1).join(':').trim();
-      }
-
-      const startDateTime = item.start.dateTime || item.start.date;
-      const endDateTime = item.end.dateTime || item.end.date;
-      const startDate = new Date(startDateTime);
-      const isoDate = startDate.toISOString().split('T')[0];
-
-      const formattedDate = startDate.toLocaleDateString('fr-FR', {
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-      });
-
-      let formattedTime = 'Toute la journée';
-      if (item.start.dateTime && item.end.dateTime) {
-        const startTime = new Date(startDateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        const endTime   = new Date(endDateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        formattedTime = `${startTime} – ${endTime}`;
-      }
-
-      let weather: EventWeather | undefined = undefined;
-      if (weatherDaily && weatherDaily.time) {
-        const wIndex = weatherDaily.time.indexOf(isoDate);
-        if (wIndex !== -1) {
-          const wInfo = getWeatherInfo(weatherDaily.weathercode[wIndex]);
-          weather = {
-            icon: wInfo.icon,
-            label: wInfo.label,
-            minTemp: Math.round(weatherDaily.temperature_2m_min[wIndex]),
-            maxTemp: Math.round(weatherDaily.temperature_2m_max[wIndex])
-          };
+    if (data.items) {
+      events = data.items.map((item: any) => {
+        let category = 'Général';
+        let title = item.summary || 'Événement sans titre';
+        if (title.includes(':')) {
+          const parts = title.split(':');
+          category = parts[0].trim();
+          title = parts.slice(1).join(':').trim();
         }
-      }
 
-      return { title, start: formattedDate, isoDate, time: formattedTime, location: item.location || '', description: item.description || '', category, weather };
-    });
+        const startDateTime = item.start.dateTime || item.start.date;
+        const endDateTime = item.end.dateTime || item.end.date;
+        const startDate = new Date(startDateTime);
+        const isoDate = startDate.toISOString().split('T')[0];
+
+        const formattedDate = startDate.toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        });
+
+        let formattedTime = 'Toute la journée';
+        if (item.start.dateTime && item.end.dateTime) {
+          const startTime = new Date(startDateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+          const endTime   = new Date(endDateTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+          formattedTime = `${startTime} – ${endTime}`;
+        }
+
+        let weather: EventWeather | undefined = undefined;
+        if (weatherDaily && weatherDaily.time) {
+          const wIndex = weatherDaily.time.indexOf(isoDate);
+          if (wIndex !== -1) {
+            const wInfo = getWeatherInfo(weatherDaily.weathercode[wIndex]);
+            weather = {
+              icon: wInfo.icon,
+              label: wInfo.label,
+              minTemp: Math.round(weatherDaily.temperature_2m_min[wIndex]),
+              maxTemp: Math.round(weatherDaily.temperature_2m_max[wIndex])
+            };
+          }
+        }
+
+        return { title, start: formattedDate, isoDate, time: formattedTime, location: item.location || '', description: item.description || '', category, weather };
+      });
+    }
   }
 } catch (e: any) {
   console.error("Erreur calendrier Google:", e.message);

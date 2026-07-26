@@ -16,8 +16,12 @@ export async function getUpcomingCalendarEvents(): Promise<CalendarEventItem[]> 
   try {
     const calendarId = '221cd9f549c1f1a88c6f99b34d65feba6a225a0d8a520b58c5f71d169effeaa5@group.calendar.google.com';
     const apiKey = (typeof process !== 'undefined' && process.env.GOOGLE_CALENDAR_API_KEY)
-      || (import.meta && import.meta.env && import.meta.env.GOOGLE_CALENDAR_API_KEY)
-      || 'AIzaSyDESZ8vJgN7QVPGvqcbZX0OnpO1gDjHWFw';
+      || (import.meta && import.meta.env && import.meta.env.GOOGLE_CALENDAR_API_KEY);
+
+    if (!apiKey) {
+      console.warn("GOOGLE_CALENDAR_API_KEY non configurée.");
+      return [];
+    }
     
     const timeMin = new Date().toISOString();
     const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&singleEvents=true&orderBy=startTime&maxResults=15`;

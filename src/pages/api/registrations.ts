@@ -83,8 +83,9 @@ export const GET: APIRoute = async ({ url }) => {
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {
+    console.error('Erreur API Registrations:', err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: import.meta.env.PROD ? 'Une erreur interne est survenue.' : err.message }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
