@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { Image } from 'astro:assets';
 import GlassCard from '../components/GlassCard.astro';
 import CalendarWidget from '../components/CalendarWidget.astro';
 import TarifsSection from '../components/TarifsSection.astro';
@@ -15,7 +16,7 @@ import LiveRegistrationsWidget from '../components/LiveRegistrationsWidget.astro
   <!-- ═══════════════ HERO ═══════════════ -->
   <section class="hero" aria-label="Section principale">
     <div class="hero-bg" aria-hidden="true">
-      <img src="/tactical_terrain.webp" alt="Terrain tactique ASAP Airsoft Nay" width="1920" height="1080" class="hero-img" fetchpriority="high" />
+      <Image src="/tactical_terrain.webp" alt="Terrain tactique ASAP Airsoft Nay" width={1920} height={1080} class="hero-img" loading="eager" fetchpriority="high" />
       <div class="hero-overlay"></div>
     </div>
 

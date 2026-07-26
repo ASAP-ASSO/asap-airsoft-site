@@ -1,4 +1,6 @@
 ---
+import { Image } from 'astro:assets';
+
 interface Props {
   title?: string;
   subtitle?: string;
@@ -30,7 +32,7 @@ const Tag = href ? 'a' : 'div';
 >
   {image && (
     <div class="card-img-wrap">
-      <img src={image} alt={title || ''} loading="lazy" decoding="async" />
+      <Image src={image} alt={title || ''} width={800} height={450} loading="lazy" decoding="async" />
       <div class="card-img-fade" aria-hidden="true"></div>
       {badge && (
         <span class={`badge badge-${badgeVariant} card-badge`}>{badge}</span>

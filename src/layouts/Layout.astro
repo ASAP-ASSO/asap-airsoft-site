@@ -56,6 +56,22 @@ const isActive = (path: string) => {
     <title>{title} | ASAP Airsoft Nay (64)</title>
     <ClientRouter />
 
+    <!-- Privacy-First Analytics (Sans cookies, 100% RGPD Compliant) -->
+    {import.meta.env.PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN && (
+      <script
+        defer
+        src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon={`{"token": "${import.meta.env.PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN}"}`}
+      />
+    )}
+    {import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN && (
+      <script
+        defer
+        data-domain={import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN}
+        src="https://plausible.io/js/script.js"
+      />
+    )}
+
     <!-- Schema.org Organization / SportsClub / Machine Experience (MX) -->
     <script type="application/ld+json" is:inline>
       {

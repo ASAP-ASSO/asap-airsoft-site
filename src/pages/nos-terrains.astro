@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { Image } from 'astro:assets';
 import CaubousMap from '../components/CaubousMap.astro';
 import ReglementModal from '../components/ReglementModal.astro';
 import Breadcrumb from '../components/Breadcrumb.astro';
@@ -13,7 +14,7 @@ import Breadcrumb from '../components/Breadcrumb.astro';
   <!-- HEADER PAGE -->
   <div class="page-header">
     <div class="terrain-hero-img-wrap">
-      <img src="/tactical_terrain.webp" alt="Terrain Parc de Caubous ASAP Airsoft" width="1920" height="600" loading="eager" />
+      <Image src="/tactical_terrain.webp" alt="Terrain Parc de Caubous ASAP Airsoft" width={1920} height={600} loading="eager" />
       <div class="terrain-hero-fade"></div>
     </div>
     <div class="container terrain-header-content">

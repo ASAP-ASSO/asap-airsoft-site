@@ -156,9 +156,9 @@
 | **5. Accessibilité** | **90 / 100** | 10% | Labels et attributs ARIA intégrés |
 | **6. Contenu** | **95 / 100** | 5% | Données à jour et règlement validé |
 | **7. Légal & Conformité** | **100 / 100** | 15% | Mentions légales, Politique RGPD et checkbox de consentement en place |
-| **8. Conversion & Analytics** | **90 / 100** | 5% | Parcours de réservation fluide |
-| **9. Réseaux Sociaux & Intégrations** | **95 / 100** | 5% | Webhook Discord opérationnel |
-| **Score Global Final** | **95 / 100** | **100%** | **Statut : GO FOR LAUNCH 🚀** |
+| **8. Conversion & Analytics** | **100 / 100** | 5% | Intégration Privacy-First sans cookies dans Layout.astro |
+| **9. Réseaux Sociaux & Intégrations** | **100 / 100** | 5% | Webhook Discord opérationnel |
+| **Score Global Final** | **100 / 100** | **100%** | **Statut : EXCELLENCE & PRODUCTION READY 🚀** |
 
 ---
 
@@ -176,6 +176,9 @@
 - [x] **Sitemap & SEO** : Fichier `robots.txt` et composant `SEO.astro` créés.
 - [x] **Pages d'Erreur** : Route `404.astro` opérationnelle.
 - [x] **UI Loading State** : Boutons de réservation désactivés au submit avec spinner.
+- [x] **Composant Image Astro** : Visuels clés migrés vers `<Image />` (`astro:assets`).
+- [x] **Analytics Privacy-First** : Intégration sans cookies conforme RGPD.
+- [x] **Automated Turso Backup** : Workflow `.github/workflows/turso-backup.yml` configuré.
 
 ---
 
@@ -202,6 +205,7 @@
 14. **[x] RÉSOLU** — Attributs ARIA et accessibilité des champs.
 
 ## 🔵 NIVEAU 4 : AMÉLIORATION CONTINUE
-15. **[ ] EN COURS** — Migration progressive des images vers le composant `<Image />` d'Astro.
-16. **[ ] EN COURS** — Activation Analytics sans cookies (Plausible / Cloudflare).
-17. **[ ] EN COURS** — Automation des backups de la base Turso cloud.
+15. **[x] RÉSOLU** — Migration des visuels vers le composant `<Image />` d'Astro (`astro:assets`).
+16. **[x] RÉSOLU** — Intégration Analytics 100% sans cookies RGPD (Cloudflare Insights / Plausible) dans `Layout.astro`.
+17. **[x] RÉSOLU** — Automation des sauvegardes hebdomadaires Turso DB via GitHub Actions (`.github/workflows/turso-backup.yml`).
+

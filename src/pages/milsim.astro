@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { Image } from 'astro:assets';
 import Breadcrumb from '../components/Breadcrumb.astro';
 ---
 
@@ -11,7 +12,7 @@ import Breadcrumb from '../components/Breadcrumb.astro';
   <!-- HERO MILSIM -->
   <div class="milsim-hero">
     <div class="milsim-hero-bg">
-      <img src="/milsim_player.webp" alt="Opérateur Milsim ASAP" width="1920" height="900" loading="eager" />
+      <Image src="/milsim_player.webp" alt="Opérateur Milsim ASAP" width={1920} height={900} loading="eager" />
       <div class="milsim-hero-overlay"></div>
     </div>
     <div class="container milsim-hero-content">
